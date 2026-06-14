@@ -9,7 +9,7 @@ import '../../../services/vidya_connection.dart';
 import '../../../utils/platform_detector.dart';
 
 class VidyaCoursePanel extends StatefulWidget {
-  final VidyaConnection connection;
+  final VidyaPlaybackSession connection;
 
   const VidyaCoursePanel({super.key, required this.connection});
 

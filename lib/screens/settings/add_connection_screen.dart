@@ -11,6 +11,7 @@ import '../../widgets/focused_scroll_scaffold.dart';
 import '../profile/borrow_connection_screen.dart';
 import 'add_jellyfin_screen.dart';
 import 'add_plex_account_screen.dart';
+import 'add_vidya_screen.dart';
 
 /// Picker shown when the user taps "Add connection".
 ///
@@ -44,6 +45,14 @@ class AddConnectionScreen extends StatelessWidget {
             ? t.addServer.connectToJellyfinCardSubtitleScoped(name: targetProfile!.displayName)
             : t.addServer.connectToJellyfinCardSubtitle,
         builder: (_) => AddJellyfinScreen(targetProfile: targetProfile),
+      ),
+      _BackendOption(
+        backend: MediaBackend.vidya,
+        title: 'Connect to VIDYA',
+        subtitle: scoped
+            ? 'Add VIDYA learning platform for ${targetProfile!.displayName}'
+            : 'Sign in to your VIDYA learning platform',
+        builder: (_) => AddVidyaScreen(targetProfile: targetProfile),
       ),
     ];
     return FocusedScrollScaffold(

@@ -196,6 +196,7 @@ sealed class MediaItem with _$MediaItem {
         backendFolderKey: backendFolderKey,
         raw: raw,
       ),
+      MediaBackend.vidya => throw UnsupportedError('MediaItem factory does not support VIDYA'),
     };
   }
 
@@ -354,6 +355,7 @@ sealed class MediaItem with _$MediaItem {
     return switch (MediaBackend.fromString(json['backend'] as String?)) {
       MediaBackend.plex => _$PlexMediaItemFromJson(json),
       MediaBackend.jellyfin => _$JellyfinMediaItemFromJson(json),
+      MediaBackend.vidya => throw UnsupportedError('MediaItem.fromJson does not support VIDYA'),
     };
   }
 

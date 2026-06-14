@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'vidya_connection.dart';
 
 class VidyaApiClient {
-  final VidyaConnection connection;
+  final VidyaPlaybackSession connection;
 
   VidyaApiClient(this.connection);
 

@@ -68,6 +68,7 @@ abstract class LibraryAlphaBarStrategy {
         isShared: isShared,
       ),
       MediaBackend.jellyfin => const JellyfinAlphaBarStrategy(),
+      MediaBackend.vidya => throw UnsupportedError('VIDYA libraries do not support alpha bar'),
     };
   }
 }

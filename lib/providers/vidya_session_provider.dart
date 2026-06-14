@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart';
 import '../services/vidya_connection.dart';
 
 class VidyaSessionProvider extends ChangeNotifier {
-  VidyaConnection? _connection;
+  VidyaPlaybackSession? _connection;
 
-  VidyaConnection? get connection => _connection;
+  VidyaPlaybackSession? get connection => _connection;
 
-  void setSession(VidyaConnection connection) {
+  void setSession(VidyaPlaybackSession connection) {
     _connection = connection;
     notifyListeners();
   }

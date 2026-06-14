@@ -47,6 +47,7 @@ class CredentialVault {
     final tokenKey = switch (kind) {
       'plex' => 'accountToken',
       'jellyfin' => 'accessToken',
+      'vidya' => 'accessToken',
       _ => null,
     };
     final token = tokenKey == null ? null : copy[tokenKey];
@@ -65,6 +66,7 @@ class CredentialVault {
     final tokenKey = switch (kind) {
       'plex' => 'accountToken',
       'jellyfin' => 'accessToken',
+      'vidya' => 'accessToken',
       _ => null,
     };
     var migrated = false;

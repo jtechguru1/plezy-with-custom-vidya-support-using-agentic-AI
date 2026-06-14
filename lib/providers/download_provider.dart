@@ -523,6 +523,7 @@ class DownloadProvider extends ChangeNotifier with DisposableChangeNotifierMixin
             final synthesizedRaw = switch (meta.backend) {
               MediaBackend.plex => <String, dynamic>{'key': '/library/metadata/$showRatingKey'},
               MediaBackend.jellyfin => <String, dynamic>{'Id': showRatingKey, 'Type': 'Series'},
+              MediaBackend.vidya => throw UnsupportedError('VIDYA does not support downloads'),
             };
             shows[showRatingKey] = MediaItem(
               id: showRatingKey,

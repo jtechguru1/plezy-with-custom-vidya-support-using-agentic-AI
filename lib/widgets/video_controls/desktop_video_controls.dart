@@ -109,7 +109,7 @@ class DesktopVideoControls extends StatefulWidget {
   final Function(Duration position)? onSeekCompleted;
 
   /// When non-null, shows the VIDYA course content side panel.
-  final VidyaConnection? vidyaConnection;
+  final VidyaPlaybackSession? vidyaConnection;
 
   const DesktopVideoControls({
     super.key,

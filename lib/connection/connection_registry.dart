@@ -175,6 +175,13 @@ class ConnectionRegistry {
           createdAt: createdAt,
           lastAuthenticatedAt: lastAuth,
         ),
+        ConnectionKind.vidya => VidyaAccountConnection.fromConfigJson(
+          id: row.id,
+          json: revealed.config,
+          status: ConnectionStatus.unknown,
+          createdAt: createdAt,
+          lastAuthenticatedAt: lastAuth,
+        ),
       };
       if (revealed.migrated) {
         await upsert(connection);

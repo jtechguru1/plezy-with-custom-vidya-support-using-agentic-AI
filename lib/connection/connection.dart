@@ -7,22 +7,26 @@ import '../services/plex_auth_service.dart';
 /// (e.g. database column values).
 enum ConnectionKind {
   plex,
-  jellyfin;
+  jellyfin,
+  vidya;
 
   String get id => switch (this) {
     ConnectionKind.plex => 'plex',
     ConnectionKind.jellyfin => 'jellyfin',
+    ConnectionKind.vidya => 'vidya',
   };
 
   static ConnectionKind fromId(String id) => switch (id) {
     'plex' => ConnectionKind.plex,
     'jellyfin' => ConnectionKind.jellyfin,
+    'vidya' => ConnectionKind.vidya,
     _ => throw ArgumentError('Unknown ConnectionKind id: $id'),
   };
 
   MediaBackend get backend => switch (this) {
     ConnectionKind.plex => MediaBackend.plex,
     ConnectionKind.jellyfin => MediaBackend.jellyfin,
+    ConnectionKind.vidya => MediaBackend.vidya,
   };
 }
 
@@ -357,6 +361,120 @@ class JellyfinConnection extends Connection {
       accessToken: json['accessToken'] as String? ?? '',
       deviceId: json['deviceId'] as String? ?? '',
       isAdministrator: json['isAdministrator'] as bool? ?? false,
+      status: status,
+      createdAt: createdAt,
+      lastAuthenticatedAt: lastAuthenticatedAt,
+    );
+  }
+}
+
+/// A VIDYA learning platform connection.
+class VidyaAccountConnection extends Connection {
+  @override
+  final String id;
+
+  @override
+  final ConnectionStatus status;
+
+  @override
+  final DateTime createdAt;
+
+  @override
+  final DateTime? lastAuthenticatedAt;
+
+  /// VIDYA server base URL, no trailing slash.
+  final String baseUrl;
+
+  /// Display name for the server (derived from hostname at auth time).
+  final String serverName;
+
+  /// Authenticated VIDYA user id.
+  final String userId;
+
+  /// Authenticated user's display name.
+  final String userName;
+
+  /// JWT access token from `/api/auth/token`.
+  final String accessToken;
+
+  VidyaAccountConnection({
+    required this.id,
+    required this.baseUrl,
+    required this.serverName,
+    required this.userId,
+    required this.userName,
+    required this.accessToken,
+    this.status = ConnectionStatus.unknown,
+    required this.createdAt,
+    this.lastAuthenticatedAt,
+  });
+
+  @override
+  ConnectionKind get kind => ConnectionKind.vidya;
+
+  @override
+  String get displayName => '$userName · $serverName';
+
+  @override
+  String get displayLabel => serverName;
+
+  @override
+  String? get displaySubtitle => '$userName · ${_truncateUrl(baseUrl)}';
+
+  static String _truncateUrl(String url) {
+    if (url.length <= 40) return url;
+    return '${url.substring(0, 37)}…';
+  }
+
+  VidyaAccountConnection copyWith({
+    String? id,
+    String? baseUrl,
+    String? serverName,
+    String? userId,
+    String? userName,
+    String? accessToken,
+    ConnectionStatus? status,
+    DateTime? createdAt,
+    DateTime? lastAuthenticatedAt,
+  }) {
+    return VidyaAccountConnection(
+      id: id ?? this.id,
+      baseUrl: baseUrl ?? this.baseUrl,
+      serverName: serverName ?? this.serverName,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
+      accessToken: accessToken ?? this.accessToken,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      lastAuthenticatedAt: lastAuthenticatedAt ?? this.lastAuthenticatedAt,
+    );
+  }
+
+  @override
+  Map<String, Object?> toConfigJson() {
+    return {
+      'baseUrl': baseUrl,
+      'serverName': serverName,
+      'userId': userId,
+      'userName': userName,
+      'accessToken': accessToken,
+    };
+  }
+
+  factory VidyaAccountConnection.fromConfigJson({
+    required String id,
+    required Map<String, Object?> json,
+    required ConnectionStatus status,
+    required DateTime createdAt,
+    DateTime? lastAuthenticatedAt,
+  }) {
+    return VidyaAccountConnection(
+      id: id,
+      baseUrl: json['baseUrl'] as String? ?? '',
+      serverName: json['serverName'] as String? ?? 'VIDYA',
+      userId: json['userId'] as String? ?? '',
+      userName: json['userName'] as String? ?? '',
+      accessToken: json['accessToken'] as String? ?? '',
       status: status,
       createdAt: createdAt,
       lastAuthenticatedAt: lastAuthenticatedAt,
