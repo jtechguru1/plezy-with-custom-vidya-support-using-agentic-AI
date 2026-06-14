@@ -60,7 +60,7 @@ class _AddVidyaScreenState extends State<AddVidyaScreen> with AsyncFormStateMixi
       url = url.substring(0, url.length - 1);
     }
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://$url';
+      url = 'http://$url';
     }
     return url;
   }
@@ -93,8 +93,8 @@ class _AddVidyaScreenState extends State<AddVidyaScreen> with AsyncFormStateMixi
         final user = json['user'] as Map<String, dynamic>? ?? {};
         final userId = (user['id'] ?? '').toString();
         final userName = user['username'] as String? ?? username;
-        final host = Uri.tryParse(normalizedUrl)?.host ?? '';
-        final serverName = host.isNotEmpty ? host : 'VIDYA';
+        final authority = Uri.tryParse(normalizedUrl)?.authority ?? '';
+        final serverName = authority.isNotEmpty ? authority : 'VIDYA';
 
         final now = DateTime.now();
         final connection = VidyaAccountConnection(
@@ -193,7 +193,7 @@ class _AddVidyaScreenState extends State<AddVidyaScreen> with AsyncFormStateMixi
                     onNavigateDown: () => _usernameFocus.requestFocus(),
                     decoration: const InputDecoration(
                       labelText: 'Server URL',
-                      hintText: 'https://vidya.example.com',
+                      hintText: 'http://192.168.1.x:31415',
                       prefixIcon: AppIcon(Symbols.link_rounded, fill: 1),
                     ),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
