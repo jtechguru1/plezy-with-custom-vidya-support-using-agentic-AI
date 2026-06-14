@@ -91,6 +91,7 @@ import '../focus/dpad_navigator.dart';
 import '../focus/key_event_utils.dart';
 import '../i18n/strings.g.dart';
 import '../watch_together/providers/watch_together_provider.dart';
+import '../providers/vidya_session_provider.dart';
 
 part 'video_player/parts/companion_remote.dart';
 part 'video_player/parts/display_matching.dart';

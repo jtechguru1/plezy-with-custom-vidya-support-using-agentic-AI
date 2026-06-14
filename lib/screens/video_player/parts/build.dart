@@ -205,10 +205,18 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
               // macOS PiP placeholder — video is in PiP window, show background with icon
               // Placed before Video so controls render on top
               if (Platform.isMacOS) const VideoPlayerMacPipPlaceholder(),
-              Center(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final newSize = Size(constraints.maxWidth, constraints.maxHeight);
+              // When a VIDYA session is active the course panel (300 px wide)
+              // overlays the right side of the Video widget. Shift the video
+              // surface into the left portion so MPV doesn't render behind it.
+              Builder(builder: (context) {
+                final hasVidya = context.watch<VidyaSessionProvider>().connection != null;
+                return AnimatedPadding(
+                  duration: const Duration(milliseconds: 200),
+                  padding: EdgeInsets.only(right: hasVidya ? 300.0 : 0.0),
+                  child: Center(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final newSize = Size(constraints.maxWidth, constraints.maxHeight);
                     _scheduleVideoLayoutUpdate(newSize);
 
                     // Compute canControl from Watch Together provider (reactive)
@@ -303,6 +311,8 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
                   },
                 ),
               ),
+            ); // AnimatedPadding
+              }),  // Builder
               // Netflix-style auto-play overlay (hidden in PiP mode)
               VideoPlayerPlayNextOverlay(
                 visible: _showPlayNextDialog,
