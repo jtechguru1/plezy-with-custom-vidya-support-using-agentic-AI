@@ -156,17 +156,13 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
   }
 
   Widget _buildVideoPlayer(BuildContext context) {
-    // Cache platform detection to avoid multiple calls
     final isMobile = PlatformDetector.isMobile(context);
     final hideChromeOnMouseExit = !(isMobile && !PlatformDetector.isTV());
 
-    // Back handling (sheet-close + player exit) is owned by the OverlaySheetHost
-    // that wraps this widget — see video_player_screen.dart (canPop/onSystemBack).
     return Scaffold(
-      // Use transparent background on macOS when native video layer is active
       backgroundColor: Colors.transparent,
       body: GestureDetector(
-        behavior: HitTestBehavior.translucent, // Allow taps to pass through to controls
+        behavior: HitTestBehavior.translucent,
         onScaleStart: (details) {
           if (!isMobile) return;
           if (details.pointerCount >= 2) _startMobileZoomGesture();
@@ -200,153 +196,168 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
         child: PlayerChromeInteractionRegion(
           controller: _chromeController,
           hideOnExit: hideChromeOnMouseExit,
-          child: Stack(
-            children: [
-              // macOS PiP placeholder — video is in PiP window, show background with icon
-              // Placed before Video so controls render on top
-              if (Platform.isMacOS) const VideoPlayerMacPipPlaceholder(),
-              // When a VIDYA session is active the course panel (300 px wide)
-              // overlays the right side of the Video widget. Shift the video
-              // surface into the left portion so MPV doesn't render behind it.
-              Builder(builder: (context) {
-                final hasVidya = context.watch<VidyaSessionProvider>().connection != null;
-                return AnimatedPadding(
-                  duration: const Duration(milliseconds: 200),
-                  padding: EdgeInsets.only(right: hasVidya ? 300.0 : 0.0),
-                  child: Center(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final newSize = Size(constraints.maxWidth, constraints.maxHeight);
-                    _scheduleVideoLayoutUpdate(newSize);
+          child: Builder(builder: (context) {
+            // Watch VIDYA session; when active the panel sits beside the video.
+            final vidyaSession = context.watch<VidyaSessionProvider>().connection;
 
-                    // Compute canControl from Watch Together provider (reactive)
-                    bool canControl = true;
-                    try {
-                      canControl = context.select<WatchTogetherProvider, bool>(
-                        (wt) => wt.isInSession ? wt.canControl() : true,
-                      );
-                    } catch (e) {
-                      // Watch Together not available, default to can control
-                    }
+            // Reactive state computed here so it drives the whole layout rebuild.
+            bool canControl = true;
+            try {
+              canControl = context.select<WatchTogetherProvider, bool>(
+                (wt) => wt.isInSession ? wt.canControl() : true,
+              );
+            } catch (e) {
+              // Watch Together not available, default to can control
+            }
 
-                    VoidCallback? onNext;
-                    if (widget.isLive) {
-                      onNext = _hasNextChannel ? () => _switchLiveChannel(1) : null;
-                    } else {
-                      onNext = (_nextEpisode != null && _canNavigateEpisodes()) ? _playNext : null;
-                    }
+            VoidCallback? onNext;
+            if (widget.isLive) {
+              onNext = _hasNextChannel ? () => _switchLiveChannel(1) : null;
+            } else {
+              onNext = (_nextEpisode != null && _canNavigateEpisodes()) ? _playNext : null;
+            }
 
-                    VoidCallback? onPrevious;
-                    if (widget.isLive) {
-                      onPrevious = _hasPreviousChannel ? () => _switchLiveChannel(-1) : null;
-                    } else {
-                      final canRestartOrPrevious = _currentMetadata.isEpisode || _previousEpisode != null;
-                      onPrevious = (canRestartOrPrevious && _canNavigateEpisodes()) ? _restartOrPlayPrevious : null;
-                    }
+            VoidCallback? onPrevious;
+            if (widget.isLive) {
+              onPrevious = _hasPreviousChannel ? () => _switchLiveChannel(-1) : null;
+            } else {
+              final canRestartOrPrevious = _currentMetadata.isEpisode || _previousEpisode != null;
+              onPrevious = (canRestartOrPrevious && _canNavigateEpisodes()) ? _restartOrPlayPrevious : null;
+            }
 
-                    final sourceAudioTracks = _currentMediaInfo?.audioTracks ?? const <MediaAudioTrack>[];
-                    final sourceSubtitleTracks = _sourceSubtitleTracksForControls();
+            final sourceAudioTracks = _currentMediaInfo?.audioTracks ?? const <MediaAudioTrack>[];
+            final sourceSubtitleTracks = _sourceSubtitleTracksForControls();
 
-                    return Video(
-                      player: player!,
-                      controls: (context) => PlexVideoControls(
+            // The video surface + all overlays are inside this Stack. When VIDYA
+            // is active the Stack is wrapped in a Row so MPV only fills its flex
+            // slice (~75 %) and the course panel gets the remaining space.
+            final videoStack = Stack(
+              children: [
+                // macOS PiP placeholder — video is in PiP window, show background with icon
+                // Placed before Video so controls render on top
+                if (Platform.isMacOS) const VideoPlayerMacPipPlaceholder(),
+                Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final newSize = Size(constraints.maxWidth, constraints.maxHeight);
+                      _scheduleVideoLayoutUpdate(newSize);
+
+                      return Video(
                         player: player!,
-                        metadata: _currentMetadata,
-                        onNext: onNext,
-                        onPrevious: onPrevious,
-                        availableVersions: _availableVersions,
-                        selectedMediaIndex: _effectiveSelectedMediaIndex,
-                        selectedQualityPreset: _selectedQualityPreset,
-                        serverSupportsTranscoding: _serverSupportsTranscoding,
-                        isTranscoding: _isTranscoding,
-                        isOfflinePlayback: _isOfflinePlayback,
-                        sourceAudioTracks: sourceAudioTracks,
-                        selectedAudioStreamId: _selectedAudioStreamId,
-                        sourceSubtitleTracks: sourceSubtitleTracks,
-                        selectedSubtitleStreamId: _selectedSourceSubtitleStreamIdForControls(sourceSubtitleTracks),
-                        sourcePartId: _currentMediaInfo?.partId,
-                        onPlaybackSourceChanged: _switchPlaybackSource,
-                        onTogglePIPMode: _togglePIPMode,
-                        boxFitMode: _videoFilterManager?.boxFitMode ?? 0,
-                        videoZoomScale: _videoFilterManager?.zoomScale ?? 1.0,
-                        onCycleBoxFitMode: _cycleBoxFitMode,
-                        onVideoZoomChanged: _setVideoZoom,
-                        onZoomIn: _zoomVideoIn,
-                        onZoomOut: _zoomVideoOut,
-                        onResetVideoZoom: _resetVideoZoom,
-                        onCycleAudioTrack: _cycleAudioTrack,
-                        onCycleSubtitleTrack: _cycleSubtitleTrack,
-                        onAudioTrackChanged: _onAudioTrackChanged,
-                        onSubtitleTrackChanged: _onSubtitleTrackChanged,
-                        onSecondarySubtitleTrackChanged: _onSecondarySubtitleTrackChanged,
-                        onSeekRequested: _seekPlayback,
-                        onSeekCompleted: _notifyWatchTogetherSeek,
-                        onBack: _handleBackButton,
-                        onReachedEnd: ({skipAutoPlayCountdown = false}) =>
-                            _onVideoCompleted(true, skipAutoPlayCountdown: skipAutoPlayCountdown),
-                        canControl: canControl,
-                        hasFirstFrame: _hasFirstFrame,
-                        playNextFocusNode: _showPlayNextDialog ? _playNextConfirmFocusNode : null,
-                        chromeController: _chromeController,
-                        shaderService: _shaderService,
-                        // ignore: no-empty-block - state update triggers rebuild to reflect shader change
-                        onShaderChanged: () => _setPlayerState(() {}),
-                        thumbnailDataBuilder: _scrubPreviewSource?.isAvailable == true ? _getThumbnailData : null,
-                        isLive: widget.isLive,
-                        liveChannelName: _live.channelName,
-                        captureBuffer: _live.captureBuffer,
-                        isAtLiveEdge: _live.atLiveEdge,
-                        streamStartEpoch: _live.streamStartEpoch,
-                        currentPositionEpoch: widget.isLive ? _currentPositionEpoch : null,
-                        onLiveSeek: _live.captureBuffer != null ? _seekLiveToEpoch : null,
-                        onLiveSeekBy: _live.captureBuffer != null ? _liveSeek.seekBy : null,
-                        onJumpToLive: _live.captureBuffer != null && !_live.atLiveEdge ? _jumpToLiveEdge : null,
-                        isAmbientLightingEnabled: _ambientLightingService?.isEnabled ?? false,
-                        onToggleAmbientLighting: _ambientLightingService?.isSupported == true
-                            ? _toggleAmbientLighting
-                            : null,
-                        toastController: _toastController,
-                      ),
-                    );
-                  },
+                        controls: (context) => PlexVideoControls(
+                          player: player!,
+                          metadata: _currentMetadata,
+                          onNext: onNext,
+                          onPrevious: onPrevious,
+                          availableVersions: _availableVersions,
+                          selectedMediaIndex: _effectiveSelectedMediaIndex,
+                          selectedQualityPreset: _selectedQualityPreset,
+                          serverSupportsTranscoding: _serverSupportsTranscoding,
+                          isTranscoding: _isTranscoding,
+                          isOfflinePlayback: _isOfflinePlayback,
+                          sourceAudioTracks: sourceAudioTracks,
+                          selectedAudioStreamId: _selectedAudioStreamId,
+                          sourceSubtitleTracks: sourceSubtitleTracks,
+                          selectedSubtitleStreamId: _selectedSourceSubtitleStreamIdForControls(sourceSubtitleTracks),
+                          sourcePartId: _currentMediaInfo?.partId,
+                          onPlaybackSourceChanged: _switchPlaybackSource,
+                          onTogglePIPMode: _togglePIPMode,
+                          boxFitMode: _videoFilterManager?.boxFitMode ?? 0,
+                          videoZoomScale: _videoFilterManager?.zoomScale ?? 1.0,
+                          onCycleBoxFitMode: _cycleBoxFitMode,
+                          onVideoZoomChanged: _setVideoZoom,
+                          onZoomIn: _zoomVideoIn,
+                          onZoomOut: _zoomVideoOut,
+                          onResetVideoZoom: _resetVideoZoom,
+                          onCycleAudioTrack: _cycleAudioTrack,
+                          onCycleSubtitleTrack: _cycleSubtitleTrack,
+                          onAudioTrackChanged: _onAudioTrackChanged,
+                          onSubtitleTrackChanged: _onSubtitleTrackChanged,
+                          onSecondarySubtitleTrackChanged: _onSecondarySubtitleTrackChanged,
+                          onSeekRequested: _seekPlayback,
+                          onSeekCompleted: _notifyWatchTogetherSeek,
+                          onBack: _handleBackButton,
+                          onReachedEnd: ({skipAutoPlayCountdown = false}) =>
+                              _onVideoCompleted(true, skipAutoPlayCountdown: skipAutoPlayCountdown),
+                          canControl: canControl,
+                          hasFirstFrame: _hasFirstFrame,
+                          playNextFocusNode: _showPlayNextDialog ? _playNextConfirmFocusNode : null,
+                          chromeController: _chromeController,
+                          shaderService: _shaderService,
+                          // ignore: no-empty-block - state update triggers rebuild to reflect shader change
+                          onShaderChanged: () => _setPlayerState(() {}),
+                          thumbnailDataBuilder: _scrubPreviewSource?.isAvailable == true ? _getThumbnailData : null,
+                          isLive: widget.isLive,
+                          liveChannelName: _live.channelName,
+                          captureBuffer: _live.captureBuffer,
+                          isAtLiveEdge: _live.atLiveEdge,
+                          streamStartEpoch: _live.streamStartEpoch,
+                          currentPositionEpoch: widget.isLive ? _currentPositionEpoch : null,
+                          onLiveSeek: _live.captureBuffer != null ? _seekLiveToEpoch : null,
+                          onLiveSeekBy: _live.captureBuffer != null ? _liveSeek.seekBy : null,
+                          onJumpToLive: _live.captureBuffer != null && !_live.atLiveEdge ? _jumpToLiveEdge : null,
+                          isAmbientLightingEnabled: _ambientLightingService?.isEnabled ?? false,
+                          onToggleAmbientLighting: _ambientLightingService?.isSupported == true
+                              ? _toggleAmbientLighting
+                              : null,
+                          toastController: _toastController,
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ); // AnimatedPadding
-              }),  // Builder
-              // Netflix-style auto-play overlay (hidden in PiP mode)
-              VideoPlayerPlayNextOverlay(
-                visible: _showPlayNextDialog,
-                nextEpisode: _nextEpisode,
-                autoPlayCountdown: _autoPlayCountdown,
-                cancelFocusNode: _playNextCancelFocusNode,
-                confirmFocusNode: _playNextConfirmFocusNode,
-                chromeController: _chromeController,
-                onCancel: _cancelAutoPlay,
-                onPlayNext: _playNext,
-              ),
-              // "Still watching?" overlay (hidden in PiP mode)
-              VideoPlayerStillWatchingOverlay(
-                visible: _showStillWatchingPrompt,
-                countdown: _stillWatchingCountdown,
-                pauseFocusNode: _stillWatchingPauseFocusNode,
-                continueFocusNode: _stillWatchingContinueFocusNode,
-                chromeController: _chromeController,
-                onPause: _onStillWatchingPause,
-                onContinue: _onStillWatchingContinue,
-              ),
-              // Buffering indicator (also shows during initial load, but not when exiting)
-              // Hidden in PiP mode
-              VideoPlayerBufferingOverlay(
-                isBuffering: _isBuffering,
-                hasFirstFrame: _hasFirstFrame,
-                isExiting: _isExiting,
-              ),
-              // Watch Together overlays (isolated from video surface repaints)
-              const VideoPlayerWatchTogetherOverlays(),
-              // Black overlay during exit (no spinner - just covers transparency)
-              VideoPlayerExitOverlay(isExiting: _isExiting),
-            ],
-          ),
+                // Netflix-style auto-play overlay (hidden in PiP mode)
+                VideoPlayerPlayNextOverlay(
+                  visible: _showPlayNextDialog,
+                  nextEpisode: _nextEpisode,
+                  autoPlayCountdown: _autoPlayCountdown,
+                  cancelFocusNode: _playNextCancelFocusNode,
+                  confirmFocusNode: _playNextConfirmFocusNode,
+                  chromeController: _chromeController,
+                  onCancel: _cancelAutoPlay,
+                  onPlayNext: _playNext,
+                ),
+                // "Still watching?" overlay (hidden in PiP mode)
+                VideoPlayerStillWatchingOverlay(
+                  visible: _showStillWatchingPrompt,
+                  countdown: _stillWatchingCountdown,
+                  pauseFocusNode: _stillWatchingPauseFocusNode,
+                  continueFocusNode: _stillWatchingContinueFocusNode,
+                  chromeController: _chromeController,
+                  onPause: _onStillWatchingPause,
+                  onContinue: _onStillWatchingContinue,
+                ),
+                // Buffering indicator (also shows during initial load, but not when exiting)
+                // Hidden in PiP mode
+                VideoPlayerBufferingOverlay(
+                  isBuffering: _isBuffering,
+                  hasFirstFrame: _hasFirstFrame,
+                  isExiting: _isExiting,
+                ),
+                // Watch Together overlays (isolated from video surface repaints)
+                const VideoPlayerWatchTogetherOverlays(),
+                // Black overlay during exit (no spinner - just covers transparency)
+                VideoPlayerExitOverlay(isExiting: _isExiting),
+              ],
+            );
+
+            if (vidyaSession != null) {
+              // VIDYA layout: video takes 75 % (flex 3), panel takes 25 % (flex 1).
+              // Both are direct Row children so MPV's native surface is truly
+              // constrained to the left column — not an overlay approach.
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 3, child: videoStack),
+                  Expanded(
+                    flex: 1,
+                    child: VidyaCoursePanel(connection: vidyaSession),
+                  ),
+                ],
+              );
+            }
+            return videoStack;
+          }),
         ),
       ),
     );

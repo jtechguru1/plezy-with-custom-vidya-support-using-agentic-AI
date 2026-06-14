@@ -110,7 +110,6 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 300,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.82),
         border: const Border(left: BorderSide(color: Colors.white12)),
@@ -214,6 +213,8 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
       child: ListTile(
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        focusColor: Colors.white.withValues(alpha: 0.12),
+        onTap: () {},
         leading: Icon(
           Symbols.play_circle_rounded,
           color: isCurrent ? Colors.white : Colors.white38,
@@ -267,6 +268,8 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
         return ListTile(
           dense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          focusColor: Colors.white.withValues(alpha: 0.12),
+          onTap: () {},
           leading: Icon(
             _fileIcon(resource['type'] as String?),
             color: Colors.white54,
@@ -305,8 +308,6 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
 
     return Column(
       children: [
-        if (!_isTV)
-          _buildUploadButton(),
         Expanded(
           child: _uploads!.isEmpty
               ? _buildEmpty('No uploads for this lecture')

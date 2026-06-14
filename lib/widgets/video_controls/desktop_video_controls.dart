@@ -644,15 +644,6 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
       ],
     );
 
-    if (widget.vidyaConnection != null) {
-      return Row(
-        children: [
-          Expanded(child: controls),
-          VidyaCoursePanel(connection: widget.vidyaConnection!),
-        ],
-      );
-    }
-
     return controls;
   }
 

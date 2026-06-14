@@ -92,6 +92,7 @@ import '../focus/key_event_utils.dart';
 import '../i18n/strings.g.dart';
 import '../watch_together/providers/watch_together_provider.dart';
 import '../providers/vidya_session_provider.dart';
+import '../widgets/video_controls/widgets/vidya_course_panel.dart';
 
 part 'video_player/parts/companion_remote.dart';
 part 'video_player/parts/display_matching.dart';
