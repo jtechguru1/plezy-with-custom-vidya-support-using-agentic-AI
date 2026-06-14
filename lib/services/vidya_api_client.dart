@@ -45,3 +45,38 @@ class VidyaApiClient {
   String uploadFileUrl(String uploadId) =>
       '${connection.baseUrl}/api/course/uploads/file/$uploadId';
 }
+
+/// Lightweight client for browsing VIDYA courses before a playback session
+/// is established. Uses [VidyaAccountConnection] credentials.
+class VidyaBrowseClient {
+  final String baseUrl;
+  final String accessToken;
+
+  const VidyaBrowseClient({required this.baseUrl, required this.accessToken});
+
+  Map<String, String> get _headers => {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      };
+
+  Future<List<Map<String, dynamic>>> fetchCourses() async {
+    final uri = Uri.parse('$baseUrl/api/course');
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch courses: ${response.statusCode}');
+    }
+    return (jsonDecode(response.body) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> fetchCourseDetail(String courseId) async {
+    final uri = Uri.parse('$baseUrl/api/course/$courseId');
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch course: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  String streamUrl(String lectureId) =>
+      '$baseUrl/api/course/stream/$lectureId?token=$accessToken';
+}

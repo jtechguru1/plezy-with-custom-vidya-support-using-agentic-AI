@@ -28,6 +28,7 @@ import '../../widgets/focused_scroll_scaffold.dart';
 import '../../utils/dialogs.dart';
 import '../settings/add_connection_screen.dart';
 import '../settings/edit_jellyfin_connection_screen.dart';
+import '../vidya_course_browser_screen.dart';
 import 'pin_entry_dialog.dart';
 import 'pin_status_row.dart';
 import 'profile_delete_flow.dart';
@@ -335,6 +336,10 @@ class _ConnectionsList extends StatelessWidget {
                                   unawaited(pcRegistry.setDefault(profile.id, pc.connectionId));
                                 } else if (value == 'edit') {
                                   unawaited(onEdit(conn));
+                                } else if (value == 'browse') {
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                    builder: (_) => VidyaCourseBrowserScreen(connection: conn as VidyaAccountConnection),
+                                  ));
                                 } else if (value == 'remove') {
                                   unawaited(onRemove(pc, conn));
                                 }
@@ -342,6 +347,7 @@ class _ConnectionsList extends StatelessWidget {
                               itemBuilder: (_) => [
                                 if (!pc.isDefault) AppMenuItem(value: 'default', label: t.profiles.makeDefault),
                                 if (conn is JellyfinConnection) AppMenuItem(value: 'edit', label: t.common.edit),
+                                if (conn is VidyaAccountConnection) AppMenuItem(value: 'browse', label: 'Browse Courses'),
                                 AppMenuItem(value: 'remove', label: t.profiles.removeConnection),
                               ],
                             ),
