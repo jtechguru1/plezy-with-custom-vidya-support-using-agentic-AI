@@ -10,8 +10,13 @@ import '../../../utils/platform_detector.dart';
 
 class VidyaCoursePanel extends StatefulWidget {
   final VidyaPlaybackSession connection;
+  final Future<void> Function(String lectureId, String lectureName)? onLectureSelected;
 
-  const VidyaCoursePanel({super.key, required this.connection});
+  const VidyaCoursePanel({
+    super.key,
+    required this.connection,
+    this.onLectureSelected,
+  });
 
   @override
   State<VidyaCoursePanel> createState() => _VidyaCoursePanelState();
@@ -201,25 +206,29 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
 
   Widget _buildLectureRow(Map<String, dynamic> lecture) {
     final isCurrent = lecture['id'] == widget.connection.lectureId;
+    final lectureId = lecture['id'] as String?;
+    final name = lecture['cleanedName'] as String? ?? '';
     final duration = lecture['duration'] as num?;
     final durationStr = duration != null && duration > 0
         ? _formatSeconds(duration.toInt())
         : '';
 
     return Container(
-      color: isCurrent ? Colors.white.withValues(alpha: 0.08) : null,
+      color: isCurrent ? const Color(0xFFA435F0).withValues(alpha: 0.25) : null,
       child: ListTile(
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-        focusColor: Colors.white.withValues(alpha: 0.12),
-        onTap: () {},
+        focusColor: const Color(0xFFA435F0).withValues(alpha: 0.55),
+        onTap: lectureId != null && !isCurrent
+            ? () => unawaited(widget.onLectureSelected?.call(lectureId, name) ?? Future.value())
+            : null,
         leading: Icon(
           Symbols.play_circle_rounded,
           color: isCurrent ? Colors.white : Colors.white38,
           size: 18,
         ),
         title: Text(
-          lecture['cleanedName'] as String? ?? '',
+          name,
           style: TextStyle(
             color: isCurrent ? Colors.white : Colors.white70,
             fontSize: 12,

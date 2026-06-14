@@ -46,18 +46,30 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
   final FocusNode _videoFocusNode = FocusNode();
   final FocusScopeNode _panelScopeNode = FocusScopeNode();
 
+  late String _currentLectureId;
+  late String _currentLectureTitle;
+
+  VidyaPlaybackSession get _currentSession => VidyaPlaybackSession(
+        baseUrl: widget.session.baseUrl,
+        token: widget.session.token,
+        courseId: widget.session.courseId,
+        lectureId: _currentLectureId,
+      );
+
   static const _controlsHideDuration = Duration(seconds: 4);
   static const _seekStep = Duration(seconds: 10);
 
   @override
   void initState() {
     super.initState();
+    _currentLectureId = widget.session.lectureId;
+    _currentLectureTitle = widget.lectureTitle;
     unawaited(_init());
   }
 
   Future<void> _init() async {
     final url =
-        '${widget.session.baseUrl}/api/course/stream/${widget.session.lectureId}'
+        '${widget.session.baseUrl}/api/course/stream/$_currentLectureId'
         '?token=${widget.session.token}';
     final ctrl = VideoPlayerController.networkUrl(Uri.parse(url));
     try {
@@ -162,6 +174,24 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
     return KeyEventResult.ignored;
   }
 
+  Future<void> _switchLecture(String lectureId, String lectureName) async {
+    if (lectureId == _currentLectureId) return;
+    _hideTimer?.cancel();
+    final old = _controller;
+    setState(() {
+      _controller = null;
+      _initialized = false;
+      _error = null;
+      _currentLectureId = lectureId;
+      _currentLectureTitle = lectureName;
+      _showControls = true;
+    });
+    old?.removeListener(_onPlayerEvent);
+    await old?.dispose();
+    unawaited(_init());
+    _videoFocusNode.requestFocus();
+  }
+
   @override
   void dispose() {
     _hideTimer?.cancel();
@@ -192,7 +222,7 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
                 child: Column(
                   children: [
                     Expanded(flex: 3, child: _buildVideoArea()),
-                    Expanded(flex: 1, child: VidyaLectureResources(session: widget.session)),
+                    Expanded(flex: 1, child: VidyaLectureResources(session: _currentSession)),
                   ],
                 ),
               ),
@@ -205,7 +235,10 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
                 onKeyEvent: _handlePanelKey,
                 child: FocusScope(
                   node: _panelScopeNode,
-                  child: VidyaCoursePanel(connection: widget.session),
+                  child: VidyaCoursePanel(
+                    connection: _currentSession,
+                    onLectureSelected: _switchLecture,
+                  ),
                 ),
               ),
             ),
@@ -307,7 +340,7 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    widget.lectureTitle,
+                    _currentLectureTitle,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 15,
