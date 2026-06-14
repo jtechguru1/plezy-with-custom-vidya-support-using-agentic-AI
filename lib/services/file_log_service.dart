@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import 'app_logger.dart';
+import '../utils/app_logger.dart';
 
 /// Flushes in-memory log entries to a file on external storage.
 ///
