@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../connection/connection.dart';
+import '../connection/connection_registry.dart';
+import '../media/media_backend.dart';
 import '../media/media_library.dart';
 import '../mixins/disposable_change_notifier_mixin.dart';
 import '../services/data_aggregation_service.dart';
@@ -15,9 +18,10 @@ enum LibrariesLoadState { initial, loading, loaded, error }
 /// Both SideNavigationRail and LibrariesScreen consume this provider
 /// instead of independently fetching library data.
 class LibrariesProvider extends ChangeNotifier with DisposableChangeNotifierMixin {
-  LibrariesProvider({StorageService? storageService, MultiServerProvider? multiServer})
+  LibrariesProvider({StorageService? storageService, MultiServerProvider? multiServer, ConnectionRegistry? connectionRegistry})
     : _storageService = storageService,
-      _multiServer = multiServer {
+      _multiServer = multiServer,
+      _connectionRegistry = connectionRegistry {
     // Reload libraries when a new server comes online. Servers bind in waves
     // on sign-in / profile switch and slow ones reconnect after the initial
     // load; without this they stay missing from the sidebar until a re-switch
@@ -27,6 +31,7 @@ class LibrariesProvider extends ChangeNotifier with DisposableChangeNotifierMixi
   }
 
   final MultiServerProvider? _multiServer;
+  final ConnectionRegistry? _connectionRegistry;
   StorageService? _storageService;
   DataAggregationService? _aggregationService;
   List<MediaLibrary> _libraries = [];
@@ -152,11 +157,11 @@ class LibrariesProvider extends ChangeNotifier with DisposableChangeNotifierMixi
 
       final merged = [
         for (final lib in _libraries)
-          if (!ids.contains(lib.serverId)) lib,
+          if (!ids.contains(lib.serverId) && lib.backend != MediaBackend.vidya) lib,
         ...fresh,
       ];
       final storage = _storageService ??= await StorageService.getInstance();
-      _libraries = _applyLibraryOrder(merged, storage.getLibraryOrder());
+      _libraries = [..._applyLibraryOrder(merged, storage.getLibraryOrder()), ...await _vidyaLibraries()];
       // Union *succeeded* ids only, so a server whose fetch failed is retried
       // on the next status emission instead of being cached as loaded.
       _loadedServerIds = {..._loadedServerIds, ...result.succeededServerIds};
@@ -202,7 +207,7 @@ class LibrariesProvider extends ChangeNotifier with DisposableChangeNotifierMixi
       final savedOrder = storage.getLibraryOrder();
       final orderedLibraries = _applyLibraryOrder(filteredLibraries, savedOrder);
 
-      _libraries = orderedLibraries;
+      _libraries = [...orderedLibraries, ...await _vidyaLibraries()];
       // Track which servers actually responded so [syncToOnlineServers] can tell
       // a genuinely new server from one already covered. Keyed on fetch success
       // (not on which servers returned libraries) so a zero-library server still
@@ -290,5 +295,28 @@ class LibrariesProvider extends ChangeNotifier with DisposableChangeNotifierMixi
     orderedLibraries.addAll(libraryMap.values);
 
     return orderedLibraries;
+  }
+
+  /// Returns one [MediaLibrary] per connected VIDYA account so the side rail
+  /// shows VIDYA servers alongside Plex/Jellyfin. These are appended after the
+  /// ordered server libraries and are never sorted into the saved order.
+  Future<List<MediaLibrary>> _vidyaLibraries() async {
+    if (_connectionRegistry == null) return const [];
+    try {
+      final connections = await _connectionRegistry!.list();
+      return [
+        for (final conn in connections.whereType<VidyaAccountConnection>())
+          MediaLibrary(
+            id: 'courses',
+            backend: MediaBackend.vidya,
+            title: 'Courses',
+            serverId: conn.id,
+            serverName: conn.serverName,
+          ),
+      ];
+    } catch (e) {
+      appLogger.w('LibrariesProvider: failed to load VIDYA connections', error: e);
+      return const [];
+    }
   }
 }

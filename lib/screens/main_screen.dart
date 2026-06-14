@@ -52,9 +52,13 @@ import '../utils/desktop_window_padding.dart';
 import '../widgets/side_navigation_rail.dart';
 import '../focus/dpad_navigator.dart';
 import '../focus/key_event_utils.dart';
+import '../connection/connection.dart';
+import '../connection/connection_registry.dart';
+import '../media/media_backend.dart';
 import 'discover_screen.dart';
 import 'libraries/library_quick_picker_sheet.dart';
 import 'libraries/libraries_screen.dart';
+import 'vidya_course_browser_screen.dart';
 import 'livetv/live_tv_screen.dart';
 import 'search_screen.dart';
 import 'downloads/downloads_screen.dart';
@@ -1341,8 +1345,19 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  /// Handle library selection from side navigation rail
+  /// Handle library selection from side navigation rail.
+  /// VIDYA "libraries" navigate directly to the course browser instead of
+  /// loading into the libraries screen.
   void _selectLibrary(String libraryGlobalKey) {
+    final library = context.read<LibrariesProvider>().libraries
+        .where((l) => l.globalKey == libraryGlobalKey)
+        .firstOrNull;
+
+    if (library != null && library.backend == MediaBackend.vidya) {
+      unawaited(_openVidyaCourses(library.serverId!));
+      return;
+    }
+
     _selectedLibraryGlobalKey = libraryGlobalKey;
     _selectTab(NavigationTabId.libraries);
     // Tell LibrariesScreen to load this library after tab switch
@@ -1352,6 +1367,17 @@ class _MainScreenState extends State<MainScreen>
     if (_librariesKey.currentState case final FocusableTab focusable) {
       focusable.focusActiveTabIfReady();
     }
+  }
+
+  Future<void> _openVidyaCourses(String connectionId) async {
+    final connections = await context.read<ConnectionRegistry>().list();
+    final conn = connections.whereType<VidyaAccountConnection>()
+        .where((c) => c.id == connectionId)
+        .firstOrNull;
+    if (conn == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => VidyaCourseBrowserScreen(connection: conn)),
+    );
   }
 
   void _openSettings() {

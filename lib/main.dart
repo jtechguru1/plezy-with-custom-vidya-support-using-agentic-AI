@@ -921,6 +921,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                   create: (context) => LibrariesProvider(
                     storageService: context.read<StorageService>(),
                     multiServer: context.read<MultiServerProvider>(),
+                    connectionRegistry: context.read<ConnectionRegistry>(),
                   ),
                 ),
                 ChangeNotifierProvider(

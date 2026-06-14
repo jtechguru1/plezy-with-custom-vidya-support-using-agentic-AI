@@ -2,23 +2,27 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../utils/app_logger.dart';
 
 /// Flushes in-memory log entries to a file on external storage.
 ///
-/// Enabled/disabled via the "Save logs to file" setting. When enabled, a
-/// periodic timer writes new entries from [MemoryLogOutput] to:
-///   {externalFilesDir}/Plezy/logs/plezy.log
+/// Enabled/disabled via the "Save logs to file" setting. Requests
+/// [Permission.storage] at enable time on Android ≤12; falls back to the
+/// app-private external directory on Android 13+ where that permission is
+/// unavailable. Target path (when granted):
+///   /storage/emulated/0/Documents/Plezy/logs/plezy.log
 ///
-/// On Android TV the file is reachable via ADB:
-///   adb pull /sdcard/Android/data/<packageName>/files/Plezy/logs/plezy.log
+/// Access on Google TV without a clipboard:
+///   adb pull /storage/emulated/0/Documents/Plezy/logs/plezy.log
+///   — or browse with any file manager app to Documents/Plezy/logs/
 ///
 /// Rotates to plezy.log.old when the file exceeds 2 MB.
 class FileLogService {
   FileLogService._();
 
-  static const _logDir = 'Plezy/logs';
+  static const _publicLogDir = '/storage/emulated/0/Documents/Plezy/logs';
   static const _logFile = 'plezy.log';
   static const _maxBytes = 2 * 1024 * 1024; // 2 MB
 
@@ -33,12 +37,24 @@ class FileLogService {
   static void onEnabledChanged(bool value) {
     _enabled = value;
     if (value) {
-      _startTimer();
-      unawaited(_initAndFlush());
+      unawaited(_requestPermissionAndStart());
     } else {
       _timer?.cancel();
       _timer = null;
     }
+  }
+
+  static Future<void> _requestPermissionAndStart() async {
+    if (Platform.isAndroid) {
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        // Permission denied — fall back to app-private external dir
+        // (still accessible via ADB: adb pull /sdcard/Android/data/<pkg>/files/Plezy/logs/)
+        appLogger.w('Storage permission denied; logs will write to app-private external dir');
+      }
+    }
+    _startTimer();
+    await _initAndFlush();
   }
 
   static void _startTimer() {
@@ -53,9 +69,22 @@ class FileLogService {
 
   static Future<File?> _resolveFile() async {
     try {
+      // Try public Documents directory first (requires storage permission on Android ≤12,
+      // covered by requestLegacyExternalStorage on Android 10).
+      if (Platform.isAndroid) {
+        final publicDir = Directory(_publicLogDir);
+        try {
+          await publicDir.create(recursive: true);
+          final f = File('${publicDir.path}/$_logFile');
+          return f;
+        } catch (_) {
+          // Fall through to app-private external dir
+        }
+      }
+      // Fallback: app-private external directory (no permission required).
       final base = await getExternalStorageDirectory();
       if (base == null) return null;
-      final dir = Directory('${base.path}/$_logDir');
+      final dir = Directory('${base.path}/Plezy/logs');
       await dir.create(recursive: true);
       return File('${dir.path}/$_logFile');
     } catch (_) {
