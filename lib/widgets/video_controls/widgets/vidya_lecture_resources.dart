@@ -43,7 +43,7 @@ class _VidyaLectureResourcesState extends State<VidyaLectureResources> {
   Future<void> _load() async {
     try {
       final api = VidyaApiClient(widget.session);
-      final data = await api.fetchCourse();
+      final data = await api.fetchCourseWithContent();
       final course = data['course'];
       if (course == null) {
         if (mounted) setState(() { _resourceNames = []; _loading = false; });

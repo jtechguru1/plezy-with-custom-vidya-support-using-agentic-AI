@@ -22,6 +22,24 @@ class VidyaApiClient {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Fetches course data via POST /player which includes each lecture's
+  /// `content` (resource files). The GET endpoint omits `content`.
+  /// Returns the same shape as [fetchCourse]: `{ course: {...} }`.
+  Future<Map<String, dynamic>> fetchCourseWithContent() async {
+    final uri = Uri.parse('${connection.baseUrl}/api/course/player');
+    final response = await http.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode({'CourseId': connection.courseId}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch course: ${response.statusCode}');
+    }
+    // Response is [courseObject, deflangObject]
+    final list = jsonDecode(response.body) as List;
+    return {'course': list[0] as Map<String, dynamic>};
+  }
+
   Future<List<Map<String, dynamic>>> fetchUploads() async {
     final uri = Uri.parse('${connection.baseUrl}/api/course/uploads/${connection.lectureId}');
     final response = await http.get(uri, headers: _headers);

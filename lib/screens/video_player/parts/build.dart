@@ -197,9 +197,6 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
           controller: _chromeController,
           hideOnExit: hideChromeOnMouseExit,
           child: Builder(builder: (context) {
-            // Watch VIDYA session; when active the panel sits beside the video.
-            final vidyaSession = context.watch<VidyaSessionProvider>().connection;
-
             // Reactive state computed here so it drives the whole layout rebuild.
             bool canControl = true;
             try {
@@ -341,32 +338,6 @@ extension _VideoPlayerBuildMethods on VideoPlayerScreenState {
               ],
             );
 
-            if (vidyaSession != null) {
-              // VIDYA layout: left column (~77 %) splits vertically — video on
-              // top (flex 3) and a read-only resources strip below (flex 1).
-              // Right column (~23 %) is the full-height course panel.
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      children: [
-                        Expanded(flex: 3, child: videoStack),
-                        Expanded(
-                          flex: 1,
-                          child: VidyaLectureResources(session: vidyaSession),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: VidyaCoursePanel(connection: vidyaSession),
-                  ),
-                ],
-              );
-            }
             return videoStack;
           }),
         ),

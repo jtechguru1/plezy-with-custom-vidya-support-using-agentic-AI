@@ -59,7 +59,7 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
       _courseError = null;
     });
     try {
-      final data = await _api.fetchCourse();
+      final data = await _api.fetchCourseWithContent();
       if (mounted) setState(() => _courseData = data);
     } catch (e) {
       if (mounted) setState(() => _courseError = e.toString());

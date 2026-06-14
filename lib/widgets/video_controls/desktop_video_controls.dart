@@ -26,7 +26,6 @@ import 'widgets/first_frame_guard.dart';
 import 'widgets/play_pause_stream_builder.dart';
 import 'widgets/video_controls_header.dart';
 import 'widgets/video_timeline_bar.dart';
-import 'widgets/vidya_course_panel.dart';
 import 'widgets/volume_control.dart';
 import 'widgets/track_chapter_controls.dart';
 

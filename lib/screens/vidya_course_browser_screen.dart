@@ -6,17 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../connection/connection.dart';
 import '../focus/focusable_button.dart';
-import '../media/media_backend.dart';
-import '../media/media_item.dart';
-import '../media/media_kind.dart';
-import '../providers/vidya_session_provider.dart';
-import '../services/playback_context.dart';
-import '../services/playback_initialization_types.dart';
 import '../services/vidya_api_client.dart';
 import '../services/vidya_connection.dart';
 import '../widgets/focused_scroll_scaffold.dart';
-import '../utils/video_player_navigation.dart' show kVideoPlayerRouteName;
-import 'video_player_screen.dart';
+import 'vidya_player_screen.dart';
 
 /// Two-level VIDYA course browser.
 ///
@@ -245,37 +238,12 @@ class _VidyaCourseDetailScreenState extends State<VidyaCourseDetailScreen> {
       lectureId: lectureId,
     );
     if (!mounted) return;
-    context.read<VidyaSessionProvider>().setSession(session);
-
-    final streamUrl = widget.client.streamUrl(lectureId);
-
-    // Build a minimal PlaybackContext with the direct stream URL.
-    // reportingClient is null so watch-state reporting is silently skipped.
-    final playbackContext = PlaybackContext(
-      // Use a PlexMediaItem as a carrier — backend is only used to decide
-      // whether Plex-specific seek offsets apply (they don't for direct play).
-      metadata: MediaItem(
-        id: lectureId,
-        backend: MediaBackend.plex,
-        kind: MediaKind.episode,
-        title: lectureName,
-      ),
-      result: PlaybackInitializationResult(
-        availableVersions: const [],
-        videoUrl: streamUrl,
-      ),
-      sourceKind: PlaybackSourceKind.remoteDirect,
-      reportingMode: PlaybackReportingMode.disabled,
-    );
-
-    if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          metadata: playbackContext.metadata,
-          prebuiltPlaybackFuture: Future.value(playbackContext),
+        builder: (_) => VidyaPlayerScreen(
+          session: session,
+          lectureTitle: lectureName,
         ),
-        settings: const RouteSettings(name: kVideoPlayerRouteName),
       ),
     );
   }
