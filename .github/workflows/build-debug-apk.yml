@@ -40,9 +40,20 @@ jobs:
       - name: Build debug APK (armeabi-v7a)
         run: flutter build apk --debug --target-platform android-arm
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk-armeabi-v7a
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 7
+
+      - name: Publish to debug-latest release
+        run: |
+          gh release delete debug-latest --yes 2>/dev/null || true
+          gh release create debug-latest \
+            --title "Debug APK (latest)" \
+            --notes "Auto-built debug APK for armeabi-v7a (Google TV). Not a production build." \
+            --prerelease \
+            build/app/outputs/flutter-apk/app-debug.apk#plezy-vidya-debug.apk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
