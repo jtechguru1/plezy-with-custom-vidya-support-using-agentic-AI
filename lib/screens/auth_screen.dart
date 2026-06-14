@@ -27,6 +27,7 @@ import 'auth/plex_pin_auth_flow.dart';
 import 'main_screen.dart';
 import 'profile/profile_switch_screen.dart';
 import 'settings/add_jellyfin_screen.dart';
+import 'settings/add_vidya_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -196,6 +197,12 @@ class _AuthScreenState extends State<AuthScreen> {
     // The connection persisted and the manager registered the client; move
     // straight to the main screen. [MainScreen] reads the active client
     // from the server provider, so no client argument is needed here.
+    unawaited(Navigator.pushReplacement(context, fadeRoute(const MainScreen())));
+  }
+
+  Future<void> _connectToVidya() async {
+    final added = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const AddVidyaScreen()));
+    if (!mounted || added != true) return;
     unawaited(Navigator.pushReplacement(context, fadeRoute(const MainScreen())));
   }
 
@@ -381,6 +388,16 @@ class _AuthScreenState extends State<AuthScreen> {
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
             icon: const BackendBadge(backend: MediaBackend.jellyfin, size: 18),
             label: Text(t.auth.connectToJellyfin),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FocusableButton(
+          onPressed: _connectToVidya,
+          child: OutlinedButton.icon(
+            onPressed: _connectToVidya,
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+            icon: const BackendBadge(backend: MediaBackend.vidya, size: 18),
+            label: const Text('Connect to VIDYA'),
           ),
         ),
         if (kDebugMode) ...[

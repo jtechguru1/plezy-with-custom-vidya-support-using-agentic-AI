@@ -73,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
   static const _kVideoPlayerNavigation = 'video_player_navigation';
   static const _kCrashReporting = 'crash_reporting';
   static const _kDebugLogging = 'debug_logging';
+  static const _kFileLogging = 'file_logging';
   static const _kViewLogs = 'view_logs';
   static const _kClearCache = 'clear_cache';
   static const _kResetSettings = 'reset_settings';
@@ -396,6 +397,13 @@ class _SettingsScreenState extends State<SettingsScreen> with FocusableTab, Moun
           icon: Symbols.bug_report_rounded,
           title: t.settings.debugLogging,
           subtitle: t.settings.debugLoggingDescription,
+        ),
+        SettingSwitchTile(
+          focusNode: _focusTracker.get(_kFileLogging),
+          pref: settings.SettingsService.fileLogging,
+          icon: Symbols.save_rounded,
+          title: 'Save logs to file',
+          subtitle: 'Write logs to Plezy/logs/plezy.log on device storage. Access via ADB or file manager.',
         ),
         SettingNavigationTile(
           focusNode: _focusTracker.get(_kViewLogs),
