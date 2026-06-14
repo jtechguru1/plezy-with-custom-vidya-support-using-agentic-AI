@@ -289,6 +289,8 @@ class CompanionRemoteProvider with ChangeNotifier, DisposableChangeNotifierMixin
           );
         case JellyfinConnection():
           addContext(await _createJellyfinAuthContext(connection: connection));
+        case VidyaAccountConnection():
+          break;
       }
     }
 

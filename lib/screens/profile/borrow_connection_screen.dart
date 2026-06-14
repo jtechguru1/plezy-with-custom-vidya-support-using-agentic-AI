@@ -213,6 +213,8 @@ class _BorrowConnectionScreenState extends State<BorrowConnectionScreen> {
           await _borrowPlex(cand);
         case JellyfinConnection():
           await _borrowJellyfin(cand);
+        case VidyaAccountConnection():
+          break;
       }
     } finally {
       if (mounted) {

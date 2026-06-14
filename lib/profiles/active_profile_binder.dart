@@ -320,6 +320,8 @@ class ActiveProfileBinder {
           expected.addAll(servers.map((server) => server.clientIdentifier));
         case JellyfinConnection(:final serverMachineId):
           expected.add(serverMachineId);
+        case VidyaAccountConnection():
+          break;
         case null:
           break;
       }
@@ -483,6 +485,8 @@ class ActiveProfileBinder {
         case JellyfinConnection():
           expected.add(conn.serverMachineId);
           futures.add(_bindJellyfin(conn));
+        case VidyaAccountConnection():
+          break;
       }
     }
     final results = await Future.wait(futures);
