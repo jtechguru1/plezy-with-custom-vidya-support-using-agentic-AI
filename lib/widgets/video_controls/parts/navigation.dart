@@ -8,6 +8,7 @@ extension _PlexVideoControlsNavigationMethods on _PlexVideoControlsState {
       onToggleAlwaysOnTop: Platform.isMacOS ? null : _toggleAlwaysOnTop,
     );
     final useDpad = _videoPlayerNavigationEnabled || PlatformDetector.isTV();
+    final vidyaConnection = context.watch<VidyaSessionProvider>().connection;
 
     return Listener(
       behavior: HitTestBehavior.translucent,
@@ -55,6 +56,7 @@ extension _PlexVideoControlsNavigationMethods on _PlexVideoControlsState {
         onContentStripVisibilityChanged: (visible) {
           widget.chromeController.setContentStripVisible(visible);
         },
+        vidyaConnection: vidyaConnection,
       ),
     );
   }

@@ -18,6 +18,7 @@ import '../../utils/formatters.dart';
 import '../../i18n/strings.g.dart';
 import '../../focus/focusable_wrapper.dart';
 import '../../models/livetv_capture_buffer.dart';
+import '../../services/vidya_connection.dart';
 import 'models/track_controls_state.dart';
 import 'widgets/content_strip.dart';
 import 'widgets/live_timeline_bar.dart';
@@ -25,6 +26,7 @@ import 'widgets/first_frame_guard.dart';
 import 'widgets/play_pause_stream_builder.dart';
 import 'widgets/video_controls_header.dart';
 import 'widgets/video_timeline_bar.dart';
+import 'widgets/vidya_course_panel.dart';
 import 'widgets/volume_control.dart';
 import 'widgets/track_chapter_controls.dart';
 
@@ -106,6 +108,9 @@ class DesktopVideoControls extends StatefulWidget {
   /// Called when a seek operation completes successfully.
   final Function(Duration position)? onSeekCompleted;
 
+  /// When non-null, shows the VIDYA course content side panel.
+  final VidyaConnection? vidyaConnection;
+
   const DesktopVideoControls({
     super.key,
     required this.player,
@@ -148,6 +153,7 @@ class DesktopVideoControls extends StatefulWidget {
     this.onContentStripVisibilityChanged,
     this.onSeekRequested,
     this.onSeekCompleted,
+    this.vidyaConnection,
   });
 
   @override
@@ -566,7 +572,7 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final controls = Column(
       children: [
         // Top bar with back button and title (always visible)
         _buildTopBar(context),
@@ -637,6 +643,17 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
         ),
       ],
     );
+
+    if (widget.vidyaConnection != null) {
+      return Row(
+        children: [
+          Expanded(child: controls),
+          VidyaCoursePanel(connection: widget.vidyaConnection!),
+        ],
+      );
+    }
+
+    return controls;
   }
 
   Widget _buildTopBar(BuildContext _) {

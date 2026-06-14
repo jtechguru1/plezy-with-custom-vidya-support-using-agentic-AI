@@ -53,6 +53,7 @@ import 'providers/playback_state_provider.dart';
 import 'providers/download_provider.dart';
 import 'providers/offline_mode_provider.dart';
 import 'providers/offline_watch_provider.dart';
+import 'providers/vidya_session_provider.dart';
 import 'providers/watch_state_store.dart';
 import 'providers/companion_remote_provider.dart';
 import 'providers/shader_provider.dart';
@@ -936,6 +937,7 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
                 ChangeNotifierProvider(create: (context) => PlaybackStateProvider()),
                 ChangeNotifierProvider(create: (context) => WatchTogetherProvider()),
                 ChangeNotifierProvider(create: (context) => CompanionRemoteProvider()),
+                ChangeNotifierProvider(create: (context) => VidyaSessionProvider()),
               ],
               child: const _AppShell(),
             ),

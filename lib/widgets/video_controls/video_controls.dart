@@ -79,6 +79,7 @@ import 'package:provider/provider.dart';
 import '../../models/shader_preset.dart';
 import '../../providers/playback_state_provider.dart';
 import '../../providers/shader_provider.dart';
+import '../../providers/vidya_session_provider.dart';
 import '../../services/shader_service.dart';
 
 part 'parts/key_events.dart';
