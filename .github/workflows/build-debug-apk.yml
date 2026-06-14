@@ -40,12 +40,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile --no-example
 
-      - name: Build debug APK
-        run: flutter build apk --debug --split-per-abi
+      - name: Build debug APK (armeabi-v7a)
+        run: flutter build apk --debug --target-platform android-arm
 
-      - name: Upload APKs
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apks
-          path: build/app/outputs/flutter-apk/app-*-debug.apk
+          name: debug-apk-armeabi-v7a
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-debug.apk
           retention-days: 7
