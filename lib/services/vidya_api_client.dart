@@ -39,15 +39,6 @@ class VidyaApiClient {
     }
   }
 
-  Future<http.Response> uploadFile(String fileName, List<int> bytes, String mimeType) async {
-    final uri = Uri.parse('${connection.baseUrl}/api/course/uploads/${connection.lectureId}');
-    final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer ${connection.token}'
-      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: fileName));
-    final streamed = await request.send();
-    return http.Response.fromStream(streamed);
-  }
-
   String contentUrl(String pathId) =>
       '${connection.baseUrl}/api/course/content/$pathId?token=${connection.token}';
 

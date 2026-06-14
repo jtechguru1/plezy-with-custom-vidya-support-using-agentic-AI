@@ -6,7 +6,6 @@ class VidyaSessionProvider extends ChangeNotifier {
   VidyaConnection? _connection;
 
   VidyaConnection? get connection => _connection;
-  bool get isActive => _connection != null;
 
   void setSession(VidyaConnection connection) {
     _connection = connection;
