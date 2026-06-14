@@ -224,6 +224,11 @@ class VideoPlayerScreen extends StatefulWidget {
   /// state (see [LiveTvSessionArgs]).
   final LiveTvSessionArgs? live;
 
+  /// When non-null, skip the [PlaybackSourceResolver] entirely and use this
+  /// pre-built context as the playback source. Used for VIDYA lectures whose
+  /// stream URL is known before the player opens.
+  final Future<PlaybackContext>? prebuiltPlaybackFuture;
+
   bool get isLive => live != null;
 
   const VideoPlayerScreen({
@@ -238,6 +243,7 @@ class VideoPlayerScreen extends StatefulWidget {
     this.selectedQualityPreset,
     this.selectedAudioStreamId,
     this.live,
+    this.prebuiltPlaybackFuture,
   });
 
   @override
@@ -663,43 +669,52 @@ class VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindin
       // Skipped for live TV (has its own tune path) and offline (its own
       // branch in _startPlayback).
       if (!widget.isLive && !_offlineLibraryMode && mounted) {
-        // Backend-neutral lookup so Jellyfin items also flow through here.
-        // Plex-specific transcoder caching is gated on capabilities below;
-        // Jellyfin's `streamHeaders` is empty because it embeds api_key in
-        // the query string, while Plex returns the X-Plex-* identity headers.
-        final genericClient = _getMediaServerClient(context);
-        if (genericClient == null) {
-          throw StateError('No client registered for ${_currentMetadata.serverId}');
-        }
-        // Single source of truth for showing quality controls and applying the
-        // saved startup quality. Backends that cannot transcode always start at
-        // Original even if the user picked a lower default quality.
-        _serverSupportsTranscoding = genericClient.capabilities.videoTranscoding;
-        if (widget.selectedQualityPreset == null) {
-          _selectedQualityPreset = _serverSupportsTranscoding
-              ? settingsService.read(SettingsService.defaultQualityPreset)
-              : TranscodeQualityPreset.original;
+        if (widget.prebuiltPlaybackFuture != null) {
+          // Direct-URL path (e.g. VIDYA lectures): the caller already resolved
+          // the stream URL into a PlaybackContext — skip the server resolver.
+          _serverSupportsTranscoding = false;
+          _selectedQualityPreset = TranscodeQualityPreset.original;
+          _playbackDataFuture = widget.prebuiltPlaybackFuture!;
+          _playbackDataFuture!.ignore();
         } else {
-          _selectedQualityPreset = widget.selectedQualityPreset!;
+          // Backend-neutral lookup so Jellyfin items also flow through here.
+          // Plex-specific transcoder caching is gated on capabilities below;
+          // Jellyfin's `streamHeaders` is empty because it embeds api_key in
+          // the query string, while Plex returns the X-Plex-* identity headers.
+          final genericClient = _getMediaServerClient(context);
+          if (genericClient == null) {
+            throw StateError('No client registered for ${_currentMetadata.serverId}');
+          }
+          // Single source of truth for showing quality controls and applying the
+          // saved startup quality. Backends that cannot transcode always start at
+          // Original even if the user picked a lower default quality.
+          _serverSupportsTranscoding = genericClient.capabilities.videoTranscoding;
+          if (widget.selectedQualityPreset == null) {
+            _selectedQualityPreset = _serverSupportsTranscoding
+                ? settingsService.read(SettingsService.defaultQualityPreset)
+                : TranscodeQualityPreset.original;
+          } else {
+            _selectedQualityPreset = widget.selectedQualityPreset!;
+          }
+          final playbackResolver = PlaybackSourceResolver(
+            serverManager: context.read<MultiServerProvider>().serverManager,
+            database: context.read<AppDatabase>(),
+          );
+          _playbackDataFuture = playbackResolver.resolve(
+            metadata: _currentMetadata,
+            selectedMediaIndex: _effectiveSelectedMediaIndex,
+            selectedMediaSourceId: _requestedMediaSourceId,
+            offlineLibraryMode: false,
+            qualityPreset: _selectedQualityPreset,
+            selectedAudioStreamId: _selectedAudioStreamId,
+            sessionIdentifier: _playbackSessionIdentifier,
+            transcodeSessionId: _playbackTranscodeSessionId,
+          );
+          // If MPV setup below throws before `_startPlayback` awaits this,
+          // tell Dart we've "handled" the future so it's not reported as an
+          // unhandled async error. The later `await` still receives the error.
+          _playbackDataFuture!.ignore();
         }
-        final playbackResolver = PlaybackSourceResolver(
-          serverManager: context.read<MultiServerProvider>().serverManager,
-          database: context.read<AppDatabase>(),
-        );
-        _playbackDataFuture = playbackResolver.resolve(
-          metadata: _currentMetadata,
-          selectedMediaIndex: _effectiveSelectedMediaIndex,
-          selectedMediaSourceId: _requestedMediaSourceId,
-          offlineLibraryMode: false,
-          qualityPreset: _selectedQualityPreset,
-          selectedAudioStreamId: _selectedAudioStreamId,
-          sessionIdentifier: _playbackSessionIdentifier,
-          transcodeSessionId: _playbackTranscodeSessionId,
-        );
-        // If MPV setup below throws before `_startPlayback` awaits this,
-        // tell Dart we've "handled" the future so it's not reported as an
-        // unhandled async error. The later `await` still receives the error.
-        _playbackDataFuture!.ignore();
       }
 
       if (!mounted || player != currentPlayer) return;

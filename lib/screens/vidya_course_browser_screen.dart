@@ -3,14 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../connection/connection.dart';
 import '../focus/focusable_button.dart';
+import '../media/media_backend.dart';
+import '../media/media_item.dart';
+import '../media/media_kind.dart';
 import '../providers/vidya_session_provider.dart';
+import '../services/playback_context.dart';
+import '../services/playback_initialization_types.dart';
 import '../services/vidya_api_client.dart';
 import '../services/vidya_connection.dart';
 import '../widgets/focused_scroll_scaffold.dart';
+import '../utils/video_player_navigation.dart' show kVideoPlayerRouteName;
+import 'video_player_screen.dart';
 
 /// Two-level VIDYA course browser.
 ///
@@ -231,7 +237,7 @@ class _VidyaCourseDetailScreenState extends State<VidyaCourseDetailScreen> {
     }
   }
 
-  Future<void> _playLecture(String courseId, String lectureId) async {
+  Future<void> _playLecture(String courseId, String lectureId, String lectureName) async {
     final session = VidyaPlaybackSession(
       baseUrl: widget.connection.baseUrl,
       token: widget.connection.accessToken,
@@ -241,21 +247,37 @@ class _VidyaCourseDetailScreenState extends State<VidyaCourseDetailScreen> {
     if (!mounted) return;
     context.read<VidyaSessionProvider>().setSession(session);
 
-    final uri = Uri.parse(widget.client.streamUrl(lectureId));
-    try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No video player found. Install VLC or MX Player.')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open video: $e')),
-        );
-      }
-    }
+    final streamUrl = widget.client.streamUrl(lectureId);
+
+    // Build a minimal PlaybackContext with the direct stream URL.
+    // reportingClient is null so watch-state reporting is silently skipped.
+    final playbackContext = PlaybackContext(
+      // Use a PlexMediaItem as a carrier — backend is only used to decide
+      // whether Plex-specific seek offsets apply (they don't for direct play).
+      metadata: MediaItem(
+        id: lectureId,
+        backend: MediaBackend.plex,
+        kind: MediaKind.episode,
+        title: lectureName,
+      ),
+      result: PlaybackInitializationResult(
+        availableVersions: const [],
+        videoUrl: streamUrl,
+      ),
+      sourceKind: PlaybackSourceKind.remoteDirect,
+      reportingMode: PlaybackReportingMode.disabled,
+    );
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          metadata: playbackContext.metadata,
+          prebuiltPlaybackFuture: Future.value(playbackContext),
+        ),
+        settings: const RouteSettings(name: kVideoPlayerRouteName),
+      ),
+    );
   }
 
   @override
@@ -359,7 +381,7 @@ class _SectionTile extends StatelessWidget {
   final String courseId;
   final bool isExpanded;
   final VoidCallback onToggle;
-  final Future<void> Function(String courseId, String lectureId) onPlayLecture;
+  final Future<void> Function(String courseId, String lectureId, String lectureName) onPlayLecture;
 
   const _SectionTile({
     required this.section,
@@ -424,7 +446,7 @@ class _LectureTile extends StatelessWidget {
   final Map<String, dynamic> lecture;
   final String courseId;
   final int sectionOrder;
-  final Future<void> Function(String courseId, String lectureId) onPlay;
+  final Future<void> Function(String courseId, String lectureId, String lectureName) onPlay;
 
   const _LectureTile({
     required this.lecture,
@@ -446,10 +468,10 @@ class _LectureTile extends StatelessWidget {
         : '';
 
     return FocusableButton(
-      onPressed: lectureId != null ? () => unawaited(onPlay(courseId, lectureId)) : null,
+      onPressed: lectureId != null ? () => unawaited(onPlay(courseId, lectureId, name)) : null,
       child: ListTile(
         contentPadding: const EdgeInsets.only(left: 32, right: 16),
-        onTap: lectureId != null ? () => unawaited(onPlay(courseId, lectureId)) : null,
+        onTap: lectureId != null ? () => unawaited(onPlay(courseId, lectureId, name)) : null,
         leading: Icon(
           type == 'video' ? Symbols.play_circle_rounded : Symbols.description_rounded,
           size: 20,
