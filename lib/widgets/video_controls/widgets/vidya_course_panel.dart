@@ -33,7 +33,7 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _api = VidyaApiClient(widget.connection);
     _isTV = PlatformDetector.isTV();
     _tabController.addListener(_onTabChanged);
@@ -48,7 +48,7 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
   }
 
   void _onTabChanged() {
-    if (_tabController.index == 2 && _uploads == null && !_loadingUploads) {
+    if (_tabController.index == 1 && _uploads == null && !_loadingUploads) {
       unawaited(_loadUploads());
     }
   }
@@ -122,7 +122,6 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
               controller: _tabController,
               children: [
                 _buildCourseContentTab(),
-                _buildResourcesTab(),
                 _buildUserUploadsTab(),
               ],
             ),
@@ -150,7 +149,6 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
         dividerColor: Colors.transparent,
         tabs: const [
           Tab(text: 'Course Content'),
-          Tab(text: 'Resources'),
           Tab(text: 'User Uploads'),
         ],
       ),
