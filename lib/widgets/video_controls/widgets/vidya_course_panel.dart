@@ -215,7 +215,7 @@ class _VidyaCoursePanelState extends State<VidyaCoursePanel>
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
         leading: Icon(
-          isCurrent ? Symbols.play_circle_filled_rounded : Symbols.play_circle_rounded,
+          Symbols.play_circle_rounded,
           color: isCurrent ? Colors.white : Colors.white38,
           size: 18,
         ),
