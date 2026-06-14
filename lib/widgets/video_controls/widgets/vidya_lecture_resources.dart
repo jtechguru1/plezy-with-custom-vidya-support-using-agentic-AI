@@ -55,9 +55,16 @@ class _VidyaLectureResourcesState extends State<VidyaLectureResources> {
         for (final lecture in lectures) {
           if (lecture['id'] == widget.session.lectureId) {
             final content = (lecture['content'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-            final names = content
-                .map((r) => r['cleanedName'] as String? ?? r['originalName'] as String? ?? 'File')
-                .toList();
+            final names = content.map((r) {
+              final cleaned = r['cleanedName'] as String? ?? '';
+              final original = r['originalName'] as String?;
+              final type = r['type'] as String?;
+              if (cleaned.isNotEmpty && type != null && type.isNotEmpty) {
+                return '$cleaned.$type';
+              }
+              if (original != null && original.isNotEmpty) return original;
+              return cleaned.isNotEmpty ? cleaned : 'File';
+            }).toList();
             if (mounted) setState(() { _resourceNames = names; _loading = false; });
             return;
           }

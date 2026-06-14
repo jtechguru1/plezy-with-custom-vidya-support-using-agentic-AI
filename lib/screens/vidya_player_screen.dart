@@ -43,6 +43,8 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
   String? _error;
   bool _showControls = true;
   Timer? _hideTimer;
+  final FocusNode _videoFocusNode = FocusNode();
+  final FocusScopeNode _panelScopeNode = FocusScopeNode();
 
   static const _controlsHideDuration = Duration(seconds: 4);
   static const _seekStep = Duration(seconds: 10);
@@ -119,7 +121,9 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
     unawaited(ctrl.seekTo(clamped));
   }
 
-  KeyEventResult _handleKey(FocusNode _, KeyEvent event) {
+  // Handles key events when focus is in the video area (left column).
+  // D-pad down moves focus into the course panel.
+  KeyEventResult _handleVideoKey(FocusNode _, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
     _showControlsTemporarily();
     switch (event.logicalKey) {
@@ -134,10 +138,26 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
       case LogicalKeyboardKey.arrowRight:
         _seekBy(_seekStep);
         return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowDown:
+        _panelScopeNode.requestFocus();
+        return KeyEventResult.handled;
       case LogicalKeyboardKey.goBack:
       case LogicalKeyboardKey.escape:
         Navigator.of(context).pop();
         return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  // Handles key events that bubble up from anywhere inside the course panel.
+  // Left arrow and back return focus to the video area instead of exiting.
+  KeyEventResult _handlePanelKey(FocusNode _, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        event.logicalKey == LogicalKeyboardKey.goBack ||
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      _videoFocusNode.requestFocus();
+      return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
@@ -147,6 +167,8 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
     _hideTimer?.cancel();
     _controller?.removeListener(_onPlayerEvent);
     _controller?.dispose();
+    _videoFocusNode.dispose();
+    _panelScopeNode.dispose();
     super.dispose();
   }
 
@@ -154,37 +176,40 @@ class _VidyaPlayerScreenState extends State<VidyaPlayerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Focus(
-        autofocus: true,
-        onKeyEvent: _handleKey,
-        child: GestureDetector(
-          onTap: _showControlsTemporarily,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Left column: video (75% height) + resources (25% height)
-              Expanded(
-                flex: 3,
+      body: GestureDetector(
+        onTap: _showControlsTemporarily,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left column: video (75% height) + resources (25% height).
+            // Focus here handles playback keys; D-pad down shifts focus to the panel.
+            Expanded(
+              flex: 3,
+              child: Focus(
+                focusNode: _videoFocusNode,
+                autofocus: true,
+                onKeyEvent: _handleVideoKey,
                 child: Column(
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: _buildVideoArea(),
-                    ),
-                    Expanded(
-                      flex: 1,
-                      child: VidyaLectureResources(session: widget.session),
-                    ),
+                    Expanded(flex: 3, child: _buildVideoArea()),
+                    Expanded(flex: 1, child: VidyaLectureResources(session: widget.session)),
                   ],
                 ),
               ),
-              // Right column: full-height course panel
-              Expanded(
-                flex: 1,
-                child: VidyaCoursePanel(connection: widget.session),
+            ),
+            // Right column: course panel in its own FocusScope so D-pad
+            // navigates items inside it. Left arrow / back return to video.
+            Expanded(
+              flex: 1,
+              child: Focus(
+                onKeyEvent: _handlePanelKey,
+                child: FocusScope(
+                  node: _panelScopeNode,
+                  child: VidyaCoursePanel(connection: widget.session),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
