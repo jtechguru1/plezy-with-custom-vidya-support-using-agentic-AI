@@ -47,6 +47,14 @@ class VidyaMediaServerClient extends MediaServerClient {
 
   VidyaMediaServerClient(this._connection, this._tokenManager);
 
+  // In-flight deduplication + 30-second TTL cache for /api/v1/home.
+  // Both fetchContinueWatching and fetchGlobalHubs call _fetchHome; without
+  // this they fire two serial requests per home refresh cycle.
+  Future<Map<String, dynamic>>? _pendingHomeFetch;
+  Map<String, dynamic>? _homeCache;
+  DateTime? _homeCacheTime;
+  static const _homeCacheTtl = Duration(seconds: 30);
+
   @override
   ServerId get serverId => ServerId(_connection.id);
 
@@ -133,13 +141,26 @@ class VidyaMediaServerClient extends MediaServerClient {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> _fetchHome() async {
+  Future<Map<String, dynamic>> _fetchHome() {
+    final now = DateTime.now();
+    final cached = _homeCache;
+    final cacheTime = _homeCacheTime;
+    if (cached != null && cacheTime != null && now.difference(cacheTime) < _homeCacheTtl) {
+      return Future.value(cached);
+    }
+    return _pendingHomeFetch ??= _doFetchHome().whenComplete(() => _pendingHomeFetch = null);
+  }
+
+  Future<Map<String, dynamic>> _doFetchHome() async {
     final uri = Uri.parse('${_connection.baseUrl}/api/v1/home');
     final response = await _tokenManager.get(uri);
     if (response.statusCode != 200) {
       throw Exception('Failed to load VIDYA home: ${response.statusCode}');
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    _homeCache = data;
+    _homeCacheTime = DateTime.now();
+    return data;
   }
 
   MediaItem _lectureToMediaItem(Map<String, dynamic> e) {

@@ -31,6 +31,7 @@ class VidyaPlaybackTracker {
 
   VideoPlayerController? _controller;
   String _lectureId = '';
+  SharedPreferences? _prefs;
 
   Timer? _heartbeatTimer;
   bool _wasPlaying = false;
@@ -177,6 +178,8 @@ class VidyaPlaybackTracker {
     }
   }
 
+  Future<SharedPreferences> _getPrefs() async => _prefs ??= await SharedPreferences.getInstance();
+
   Future<void> _enqueue({
     required String courseId,
     required String lessonId,
@@ -184,7 +187,7 @@ class VidyaPlaybackTracker {
     required bool isCompleted,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final raw = prefs.getString(_queueKey) ?? '[]';
       final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
       list.add({
@@ -203,7 +206,7 @@ class VidyaPlaybackTracker {
 
   Future<void> _flushQueue() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final raw = prefs.getString(_queueKey) ?? '[]';
       final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
       if (list.isEmpty) return;
