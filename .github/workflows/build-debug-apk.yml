@@ -1,4 +1,4 @@
-name: Build Debug APK
+﻿name: Build Debug APK
 
 on:
   workflow_dispatch:
@@ -42,8 +42,8 @@ jobs:
         run: |
           mkdir -p ~/.android
           if [ -n "$ANDROID_DEBUG_KEYSTORE" ]; then
-            printf '%s' "$ANDROID_DEBUG_KEYSTORE" | tr -d '[:space:]' | base64 -d > ~/.android/debug.keystore
-            echo "✅ Using keystore from secret ANDROID_DEBUG_KEYSTORE"
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE" | base64 -di > ~/.android/debug.keystore
+            echo "Using keystore from secret ANDROID_DEBUG_KEYSTORE" >> $GITHUB_STEP_SUMMARY
           else
             keytool -genkey -v \
               -keystore ~/.android/debug.keystore \
@@ -51,12 +51,14 @@ jobs:
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass android -keypass android \
               -dname "CN=Android Debug,O=Android,C=US"
-            echo "⚠️ No ANDROID_DEBUG_KEYSTORE secret found — generated a new one."
-            echo "Add the following as a GitHub secret named ANDROID_DEBUG_KEYSTORE to lock the signature across builds:"
-            echo '```'
-            base64 -w 0 ~/.android/debug.keystore
-            echo '```'
-          fi >> $GITHUB_STEP_SUMMARY
+            {
+              echo "No ANDROID_DEBUG_KEYSTORE secret found -- generated a new one."
+              echo "Set the following as a GitHub secret named ANDROID_DEBUG_KEYSTORE to lock the signature across builds:"
+              echo KEYSTORE_BASE64_BEGIN
+              base64 -w 0 ~/.android/debug.keystore
+              echo KEYSTORE_BASE64_END
+            } >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Install dependencies
         run: flutter pub get --no-example
