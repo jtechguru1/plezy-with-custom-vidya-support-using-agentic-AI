@@ -56,6 +56,30 @@ class VidyaPlaybackTracker {
     _detachController();
   }
 
+  /// Immediately syncs the current playback position. Captures controller
+  /// values synchronously so it is safe to call before [detach].
+  Future<void> syncNow({bool isCompleted = false}) async {
+    final ctrl = _controller;
+    final lid = _lectureId;
+    final cid = courseId;
+    if (ctrl == null || lid.isEmpty) return;
+    final timeSeconds = ctrl.value.position.inMilliseconds / 1000.0;
+    try {
+      await _postSync(
+          courseId: cid,
+          lessonId: lid,
+          timeSeconds: timeSeconds,
+          isCompleted: isCompleted);
+      unawaited(_flushQueue());
+    } catch (_) {
+      await _enqueue(
+          courseId: cid,
+          lessonId: lid,
+          timeSeconds: timeSeconds,
+          isCompleted: isCompleted);
+    }
+  }
+
   /// Manually flushes the offline queue. Can be called externally when
   /// connectivity is restored (e.g., from a network-change listener).
   Future<void> flushQueue() => _flushQueue();

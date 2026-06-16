@@ -100,6 +100,7 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
   bool _showControls = true;
   bool _sidebarVisible = true;
   Timer? _hideTimer;
+  Timer? _sidebarHideTimer;
 
   // ── Focus ────────────────────────────────────────────────────────────────
   final FocusNode _videoFocus = FocusNode(debugLabel: 'VidyaPlayer:Video');
@@ -107,6 +108,7 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
 
   static const _seekStep = Duration(seconds: 10);
   static const _controlsHideDuration = Duration(seconds: 4);
+  static const _sidebarHideDuration = Duration(seconds: 12);
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -121,11 +123,15 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
     );
     unawaited(_loadOutline());
     unawaited(_initVideo(_currentLessonId));
+    _startSidebarHideTimer();
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _sidebarHideTimer?.cancel();
+    // Final sync before tearing down so the server always gets the last position.
+    unawaited(_tracker.syncNow(isCompleted: _completionFired));
     _tracker.detach();
     _controller?.removeListener(_onControllerValue);
     _controller?.dispose();
@@ -234,6 +240,9 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
   Future<void> _switchLesson(String lessonId, String lessonTitle) async {
     if (lessonId == _currentLessonId) return;
     _hideTimer?.cancel();
+    // Sync current position before switching — captures values synchronously
+    // so it's safe to call before detach.
+    unawaited(_tracker.syncNow(isCompleted: _completionFired));
     _tracker.detach();
 
     final old = _controller;
@@ -287,6 +296,21 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
     _resetHideTimer();
   }
 
+  void _startSidebarHideTimer() {
+    _sidebarHideTimer?.cancel();
+    _sidebarHideTimer = Timer(_sidebarHideDuration, () {
+      if (mounted && _sidebarVisible) {
+        setState(() => _sidebarVisible = false);
+        _videoFocus.requestFocus();
+      }
+    });
+  }
+
+  void _cancelSidebarHideTimer() {
+    _sidebarHideTimer?.cancel();
+    _sidebarHideTimer = null;
+  }
+
   void _togglePlayPause() {
     _revealControls();
     final ctrl = _controller;
@@ -335,17 +359,15 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowUp:
-        // Up: move focus to sidebar for lesson navigation.
-        if (_sidebarVisible) {
-          _sidebarScope.requestFocus();
-        } else {
-          setState(() => _showControls = false);
-          _hideTimer?.cancel();
-        }
+        // Up: show sidebar if hidden, then move focus into it.
+        if (!_sidebarVisible) setState(() => _sidebarVisible = true);
+        _cancelSidebarHideTimer();
+        _sidebarScope.requestFocus();
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.goBack:
       case LogicalKeyboardKey.escape:
+        unawaited(_tracker.syncNow(isCompleted: _completionFired));
         Navigator.of(context).pop();
         return KeyEventResult.handled;
     }
@@ -354,9 +376,11 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
 
   KeyEventResult _handleSidebarKey(FocusNode _, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.goBack ||
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        event.logicalKey == LogicalKeyboardKey.goBack ||
         event.logicalKey == LogicalKeyboardKey.escape) {
       _videoFocus.requestFocus();
+      _startSidebarHideTimer();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -718,8 +742,8 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
                 event.logicalKey == LogicalKeyboardKey.enter) {
               if (!isCurrent) {
                 unawaited(_switchLesson(lesson.id, lesson.title));
-                setState(() => _sidebarVisible = false);
                 _videoFocus.requestFocus();
+                _startSidebarHideTimer();
               }
               return KeyEventResult.handled;
             }
@@ -733,8 +757,8 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
                     ? null
                     : () {
                         unawaited(_switchLesson(lesson.id, lesson.title));
-                        setState(() => _sidebarVisible = false);
                         _videoFocus.requestFocus();
+                        _startSidebarHideTimer();
                       },
                 child: Container(
                   color: isCurrent
