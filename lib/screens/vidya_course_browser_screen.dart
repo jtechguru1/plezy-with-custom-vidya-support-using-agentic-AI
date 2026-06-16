@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:provider/provider.dart';
 
 import '../connection/connection.dart';
 import '../focus/focusable_button.dart';
 import '../services/vidya_api_client.dart';
 import '../services/vidya_connection.dart';
 import '../widgets/focused_scroll_scaffold.dart';
-import 'vidya_player_screen.dart';
+import 'vidya_course_player_view.dart';
 
 /// Two-level VIDYA course browser.
 ///
@@ -240,9 +239,9 @@ class _VidyaCourseDetailScreenState extends State<VidyaCourseDetailScreen> {
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => VidyaPlayerScreen(
+        builder: (_) => VidyaCoursePlayerView(
           session: session,
-          lectureTitle: lectureName,
+          initialLectureTitle: lectureName,
         ),
       ),
     );
@@ -406,7 +405,7 @@ class _SectionTile extends StatelessWidget {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
-    return '${m}:${(seconds % 60).toString().padLeft(2, '0')}';
+    return '$m:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 }
 
@@ -463,6 +462,6 @@ class _LectureTile extends StatelessWidget {
     final m = (seconds % 3600) ~/ 60;
     final s = seconds % 60;
     if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m';
-    return '${m}:${s.toString().padLeft(2, '0')}';
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 }

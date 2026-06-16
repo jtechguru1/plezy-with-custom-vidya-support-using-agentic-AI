@@ -1,78 +1,149 @@
 # CLAUDE.md — Plezy (with VIDYA support)
 
+> Last updated: 2026-06-16 — Feature Verticals 2 & 3 complete
+
+---
+
 ## What this project is
 
 **Plezy** is a Flutter app for Android TV / Google TV that streams media from Plex and Jellyfin servers. It uses the **media_kit** package (MPV) for Plex/Jellyfin video playback.
 
-**VIDYA** is a separate self-hosted course platform (like Udemy) that was added as a custom feature. VIDYA has its own video player, separate from the MPV player used for Plex/Jellyfin.
+**VIDYA** is a separate self-hosted course platform (like Udemy) added as a first-class backend alongside Plex and Jellyfin. VIDYA has its own video player, completely separate from the MPV player.
+
+---
 
 ## Critical architecture decision: two separate video players
 
 - **Plex / Jellyfin** → `VideoPlayerScreen` → MPV via `media_kit` / `Video` widget
-- **VIDYA** → `VidyaPlayerScreen` → ExoPlayer via the `video_player` Flutter plugin
+- **VIDYA** → `VidyaCoursePlayerView` → ExoPlayer via the `video_player` Flutter plugin
 
-**Why separate?** MPV renders to a native Android `SurfaceView` that bypasses Flutter layout constraints — `Expanded`/`AnimatedPadding` constrains the Flutter widget box but the actual video surface bleeds through full-screen. The `video_player` plugin uses a `Texture` widget that genuinely respects Flutter layout bounds, which is required for the VIDYA side-by-side layout.
+**Why separate?** MPV renders to a native Android `SurfaceView` that bypasses Flutter layout constraints — `Expanded`/`AnimatedPadding` constrains the Flutter widget box but the actual video surface bleeds through full-screen. The `video_player` plugin uses a `Texture` widget that genuinely respects Flutter layout bounds, required for the VIDYA split layout.
 
-**Never route VIDYA lectures through `VideoPlayerScreen` or MPV.** They must go through `VidyaPlayerScreen`.
+**Never route VIDYA lectures through `VideoPlayerScreen` or MPV.** They must go through `VidyaCoursePlayerView`.
 
-## VIDYA screen layout
+---
+
+## VIDYA player layout (`VidyaCoursePlayerView`)
 
 ```
-┌─────────────────────────────────────┬──────────────┐
-│  VIDEO (Expanded flex:3)            │ Course panel │
-│  video_player / ExoPlayer           │ (flex:1)     │
-│  AspectRatio + letterbox            │              │
-│  Controls overlay (auto-hides 4s)   │ Course tab   │
-├─────────────────────────────────────│ User Uploads │
-│  Resources strip (Expanded flex:1)  │ tab          │
-│  Shows cleanedName.type for files   │              │
-└─────────────────────────────────────┴──────────────┘
-Left column = Expanded(flex:3), right panel = Expanded(flex:1)
-Left column splits 75/25 vertically (video top, resources bottom)
+┌────────────────────────────────────────────┬────────────────────┐
+│  VIDEO CANVAS  (flex:4 when sidebar open,  │  Course Sidebar    │
+│  full width when closed)                   │  (flex:1, toggle)  │
+│                                            │                    │
+│  [Course › Section › Lesson]  ← breadcrumb│  § Section 1       │
+│                                            │    ✓ Lesson 1.1    │
+│  Controls overlay (auto-hides 4 s):        │    ▶ Lesson 1.2 ◄  │
+│    [←10]  [▶/⏸]  [10→]  ══════  0:00     │    ○ Lesson 1.3    │
+│                                            │    📎 notes.pdf    │
+└────────────────────────────────────────────┴────────────────────┘
+Sidebar attachments are wrapped in ExcludeFocus — D-pad skips them.
 ```
 
-## D-pad / controller navigation (VidyaPlayerScreen)
+## D-pad / controller navigation (`VidyaCoursePlayerView`)
 
-- **Video area focus** (default): left/right = ±10s seek, OK/select = play/pause, down = enter panel, back = exit screen
-- **Panel focus**: up/down = navigate lecture list, left or back = return to video (does NOT exit screen)
-- Focus color for highlighted panel items: `#A435F0` at 55% opacity
-- Currently-playing lecture: `#A435F0` at 25% opacity background tint
+| Key | Context | Action |
+|-----|---------|--------|
+| Right | Video area | Opens sidebar + shifts focus to it |
+| Left | Sidebar | Closes sidebar + returns focus to video |
+| Back/Escape | Sidebar | Same as Left |
+| Down | Video area | Forces controls overlay visible (progress bar) |
+| Up | Video area | Hides controls overlay |
+| Select / Space | Video area | Play / Pause |
+| Left arrow | Video area | Seek −10 s |
+| Right arrow (sidebar closed) | Video area | Seek +10 s |
+| Back/Escape | Video area | Exit screen |
+| Select | Sidebar lesson | Switch to that lesson + close sidebar |
+
+- Currently-playing lesson: `#A435F0` at 28% opacity row tint + `play_circle_rounded` icon
+- Completed lesson: green `check_circle_rounded` icon
+- Incomplete lesson: `radio_button_unchecked_rounded` icon
+
+## Auto-advance (next lesson)
+
+When `videoPosition ≥ videoDuration − 500 ms`:
+1. Current lesson marked complete in local outline state (checkmark appears immediately)
+2. Next `type == 'video'` lesson in the flat lesson list is found
+3. `_switchLesson()` disposes the old controller and starts the new stream
+4. Focus stays in the video area
+
+---
+
+## Progress tracking (`VidyaPlaybackTracker`)
+
+`lib/services/vidya_progress_tracker.dart` — **completely isolated, no Plex/Jellyfin imports.**
+
+- Attaches to a `VideoPlayerController` via `attach(ctrl, lectureId: id)`
+- **15 s heartbeat** — `Timer.periodic`, fires only while `isPlaying == true`
+- **Immediate sync on pause** — detected via `addListener`
+- **Immediate sync on completion** — detected when `position ≥ duration − 500 ms`
+- **Offline queue** — failures serialized to `SharedPreferences` under `vidya_offline_sync_queue`; flushed automatically after every successful sync
+- Call `detach()` in `dispose()` to cancel timer and remove listener
+- Call `attach()` again when lecture changes; old listener/timer cleaned up automatically
+
+---
 
 ## Key files
 
 | File | Purpose |
 |------|---------|
-| `lib/screens/vidya_player_screen.dart` | Standalone VIDYA player (video_player, layout, D-pad, lecture switching) |
-| `lib/screens/vidya_course_browser_screen.dart` | Course browser → navigates to VidyaPlayerScreen |
-| `lib/widgets/video_controls/widgets/vidya_course_panel.dart` | Right-column panel (Course Content + User Uploads tabs) |
-| `lib/widgets/video_controls/widgets/vidya_lecture_resources.dart` | Bottom-left Resources strip (read-only, text-only) |
-| `lib/services/vidya_api_client.dart` | HTTP client for VIDYA API |
-| `lib/services/vidya_connection.dart` | `VidyaPlaybackSession` and `VidyaAccountConnection` models |
+| `lib/screens/vidya_course_player_view.dart` | **Current** VIDYA player — Udemy-style split layout, sidebar, auto-next |
+| `lib/screens/vidya_player_screen.dart` | Legacy VIDYA player — kept for reference, no longer routed to |
+| `lib/screens/vidya_course_browser_screen.dart` | Course browser → pushes `VidyaCoursePlayerView` |
+| `lib/widgets/video_controls/widgets/vidya_course_panel.dart` | Original in-player panel (Course Content + User Uploads tabs) — not used by new player |
+| `lib/widgets/video_controls/widgets/vidya_lecture_resources.dart` | Original resources strip — not used by new player |
+| `lib/services/vidya_api_client.dart` | HTTP client: `VidyaApiClient` (session-scoped) + `VidyaBrowseClient` (browse + outline) |
+| `lib/services/vidya_connection.dart` | `VidyaPlaybackSession` model |
+| `lib/services/vidya_progress_tracker.dart` | Heartbeat tracker + offline queue |
+| `lib/connection/connection.dart` | `VidyaAccountConnection` sealed class |
+| `lib/screens/settings/add_vidya_screen.dart` | Add-connection form → `POST /api/auth/token` |
 
-## VIDYA API notes
+---
 
-- `GET /api/course/:courseId` — uses `getCourseData()`, **omits** `content` (resources) from lecture objects
-- `POST /api/course/player` with body `{"CourseId": "..."}` — **includes** `content` per lecture; use `fetchCourseWithContent()` for anything that needs resources
-- Stream URL: `${baseUrl}/api/course/stream/${lectureId}?token=${token}` — token in query string, no auth headers needed (`verifyQueryToken` middleware)
-- `android:usesCleartextTraffic="true"` is already set in AndroidManifest — HTTP VIDYA servers work fine
+## VIDYA API endpoints used by Plezy
 
-## Lecture switching
+| Endpoint | Client method | Notes |
+|----------|---------------|-------|
+| `POST /api/auth/token` | `AddVidyaScreen` directly | Returns `{ token, user }` |
+| `GET /api/course` | `VidyaBrowseClient.fetchCourses()` | All courses list |
+| `GET /api/course/:courseId` | `VidyaBrowseClient.fetchCourseDetail()` | Course + sections + lectures (no progress) |
+| `GET /api/v1/courses/:courseId/outline` | `VidyaBrowseClient.fetchOutline()` | Course + sections + lessons + per-user progress + attachments |
+| `GET /api/course/stream/:lectureId?token=` | Stream URL passed to `VideoPlayerController.networkUrl()` | Range requests, token in query string |
+| `POST /api/course/player` | `VidyaApiClient.fetchCourseWithContent()` | Includes `content` array per lecture |
+| `GET /api/course/uploads/:lectureId` | `VidyaApiClient.fetchUploads()` | User uploads list |
+| `DELETE /api/course/uploads/:uploadId` | `VidyaApiClient.deleteUpload()` | Delete user upload |
+| `POST /api/v1/progress/sync` | `VidyaApiClient.syncProgress()` / `VidyaPlaybackTracker` | `{ course_id, lesson_id, time_seconds, is_completed }` |
 
-`VidyaPlayerScreen` tracks `_currentLectureId` and `_currentLectureTitle` as mutable state. `_switchLecture(lectureId, lectureName)` disposes the old `VideoPlayerController`, updates state, and calls `_init()` with the new stream URL. The panel receives `onLectureSelected: _switchLecture` as a callback.
+**Stream URL pattern:** `${baseUrl}/api/course/stream/${lectureId}?token=${token}` — no auth header needed (`verifyQueryToken` middleware).
 
-## Panel rules
+---
 
-- **Course Content tab**: lists all sections and lectures; tapping a lecture calls `onLectureSelected`
-- **User Uploads tab**: lists uploads, no upload button (read-only list only)
-- **No Resources tab in the panel** — resources are shown in the bottom-left strip instead
+## VIDYA connection model
+
+```
+VidyaAccountConnection (persisted in Drift `connections` table, kind = 'vidya')
+  ├── id          "vidya-{uuid}"
+  ├── baseUrl     "http://192.168.x.x:31415"
+  ├── serverName  derived from URL authority
+  ├── userId      from auth response
+  ├── userName    from auth response
+  └── accessToken JWT (1 h TTL; refresh via /api/auth/refresh)
+
+VidyaPlaybackSession (ephemeral, in-memory only)
+  ├── baseUrl
+  ├── token       = VidyaAccountConnection.accessToken
+  ├── courseId
+  └── lectureId
+```
+
+---
 
 ## CI / build
 
-- GitHub Actions builds the APK on every push to `main`
-- `video_player: ^2.9.2` is in `pubspec.yaml`
+- GitHub Actions builds APK on every push to `main`
+- `video_player: ^2.9.2` is in `pubspec.yaml` (used for VIDYA)
+- `android:usesCleartextTraffic="true"` is set in AndroidManifest — HTTP VIDYA servers work
 
 ## Platform target
 
-- Primary: **Android TV / Google TV** (controller/D-pad input, no touch)
-- User runs the app on a **TV with a Google TV remote**
+- Primary: **Android TV / Google TV** (D-pad / controller input, no touch)
 - VIDYA server is self-hosted, accessed over local network (HTTP)

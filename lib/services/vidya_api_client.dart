@@ -62,6 +62,29 @@ class VidyaApiClient {
 
   String uploadFileUrl(String uploadId) =>
       '${connection.baseUrl}/api/course/uploads/file/$uploadId';
+
+  /// Syncs the current playback position to `POST /api/v1/progress/sync`.
+  /// [timeSeconds] is the current player position. [isCompleted] marks the
+  /// lecture finished. Throws on non-200 so callers can queue offline.
+  Future<void> syncProgress({
+    required double timeSeconds,
+    required bool isCompleted,
+  }) async {
+    final uri = Uri.parse('${connection.baseUrl}/api/v1/progress/sync');
+    final response = await http.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode({
+        'course_id': connection.courseId,
+        'lesson_id': connection.lectureId,
+        'time_seconds': timeSeconds,
+        'is_completed': isCompleted,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Progress sync failed: ${response.statusCode}');
+    }
+  }
 }
 
 /// Lightweight client for browsing VIDYA courses before a playback session
@@ -97,4 +120,15 @@ class VidyaBrowseClient {
 
   String streamUrl(String lectureId) =>
       '$baseUrl/api/course/stream/$lectureId?token=$accessToken';
+
+  /// Fetches the full course outline with per-user completion state.
+  /// Used by [VidyaCoursePlayerView] to populate the sidebar.
+  Future<Map<String, dynamic>> fetchOutline(String courseId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/courses/$courseId/outline');
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch outline: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
 }
