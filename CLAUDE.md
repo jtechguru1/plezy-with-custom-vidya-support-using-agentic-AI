@@ -1,6 +1,6 @@
 # CLAUDE.md — Plezy (with VIDYA support)
 
-> Last updated: 2026-06-16 — Feature Vertical 4 complete (VIDYA on home screen)
+> Last updated: 2026-06-16 — Performance regression audit complete (commit df2c3047)
 
 ---
 
@@ -77,6 +77,7 @@ When `videoPosition ≥ videoDuration − 500 ms`:
 - **Immediate sync on pause** — detected via `addListener`
 - **Immediate sync on completion** — detected when `position ≥ duration − 500 ms`
 - **Offline queue** — failures serialized to `SharedPreferences` under `vidya_offline_sync_queue`; flushed automatically after every successful sync
+- **`SharedPreferences` instance is cached** via `_getPrefs()` — obtained once per tracker lifetime, not on every timer tick
 - Call `detach()` in `dispose()` to cancel timer and remove listener
 - Call `attach()` again when lecture changes; old listener/timer cleaned up automatically
 
@@ -144,13 +145,61 @@ VidyaPlaybackSession (ephemeral, in-memory only)
 
 ---
 
+## Home screen caching (`VidyaMediaServerClient`)
+
+`_fetchHome()` fetches `GET /api/v1/home` and serves both `fetchContinueWatching()` and `fetchGlobalHubs()`. To prevent two serial HTTP requests per home refresh cycle:
+
+- **30-second TTL cache** — `_homeCache` / `_homeCacheTime`; hits return immediately with no network activity
+- **In-flight deduplication** — `_pendingHomeFetch`; concurrent callers share the same `Future` rather than firing parallel requests
+
+Do not call `_fetchHome()` directly outside of `fetchContinueWatching()` / `fetchGlobalHubs()`.
+
+---
+
+## Connection cleanup (`profile_connection_cleanup.dart`)
+
+`lib/profiles/profile_connection_cleanup.dart` provides startup and settings-screen utilities for pruning orphaned Jellyfin connections and clearing stale per-server library preferences.
+
+- `pruneUnreferencedJellyfinConnections()` — called at every startup from `_SetupScreenState._loadSavedCredentials()` after `ConnectionBootstrap.run()`
+- `removeProfileConnectionAndCleanup()` — called from profile detail screen when removing a connection
+- `removeAllProfileConnectionsAndCleanup()` — called from profile delete flow
+- The sealed switch in `_serverIdsForConnection()` includes a `VidyaAccountConnection() => const {}` arm — Vidya connections carry no library preferences
+
+`StorageService` exposes `clearLibraryPreferencesForServer()` and `clearLibraryPreferencesForServerEverywhere()` which these functions depend on.
+
+---
+
+## Pointer event guard (`main.dart`)
+
+`_installZeroOffsetPointerGuard()` is an iOS/tvOS-only workaround for Flutter bug #177992 (iPadOS 26.1+ fake touch events at `(0,0)` dismissing modals). The guard **must remain iOS-only**:
+
+```dart
+// CORRECT — iOS only, PointerDownEvent only
+void _installZeroOffsetPointerGuard() {
+  if (_zeroOffsetPointerGuardInstalled || !Platform.isIOS) return;
+  ...
+}
+void _absorbZeroOffsetPointerEvent(PointerEvent event) {
+  if (event is PointerDownEvent && event.position == Offset.zero) { ... }
+}
+```
+
+Never remove `!Platform.isIOS` or the `event is PointerDownEvent` type check. Doing so causes all pointer events at `Offset.zero` to be dropped globally on Android TV, causing intermittent D-pad input loss on Plex and Jellyfin screens.
+
+---
+
 ## CI / build
 
 - GitHub Actions builds APK on every push to `main`
 - `video_player: ^2.9.2` is in `pubspec.yaml` (used for VIDYA)
 - `android:usesCleartextTraffic="true"` is set in AndroidManifest — HTTP VIDYA servers work
+- **Local compilation requires:** JDK 17 + Android Command Line Tools (SDK). See ROADMAP.md backlog.
 
 ## Platform target
 
 - Primary: **Android TV / Google TV** (D-pad / controller input, no touch)
 - VIDYA server is self-hosted, accessed over local network (HTTP)
+
+## Audit
+
+A full regressive audit was conducted on 2026-06-16 comparing this fork against the original plezy repository. See `audit.md` for complete findings. Four performance regressions were identified and fixed in commit `df2c3047`.

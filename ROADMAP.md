@@ -1,6 +1,6 @@
 # Plezy — Roadmap
 
-> Last updated: 2026-06-16 — Feature Vertical 4 complete (VIDYA on home screen)
+> Last updated: 2026-06-16 — Performance regression audit complete; all Priority 1–4 fixes applied
 
 ---
 
@@ -22,6 +22,7 @@
 | Feature Vertical 2 | ✅ Complete | VidyaPlaybackTracker — heartbeat + offline queue |
 | Feature Vertical 3 | ✅ Complete | VidyaCoursePlayerView — Udemy-style split player |
 | Feature Vertical 4 | ✅ Complete | VIDYA courses on home screen — JWT auto-refresh, MediaServerClient, home endpoint |
+| Performance Regression Audit | ✅ Complete | Full regressive audit vs original repo; 4 regressions identified and fixed (see `audit.md`) |
 
 ---
 
@@ -116,10 +117,24 @@
 
 ---
 
+## Performance Regression Audit `complete`
+
+> Full findings in `audit.md`. All four priorities fixed in commit `df2c3047`.
+
+- [x] **P1** — Restore iOS-only platform guard + `PointerDownEvent` type check in `main.dart` pointer absorber (was silently dropping all pointer events at `Offset.zero` on Android TV)
+- [x] **P2** — Add 30-second TTL cache + in-flight deduplication to `VidyaMediaServerClient._fetchHome()` (was firing two serial uncached HTTP requests per home refresh)
+- [x] **P3** — Restore `profile_connection_cleanup.dart` and startup `pruneUnreferencedJellyfinConnections()` call; port missing `StorageService` server-cleanup helpers (`clearLibraryPreferencesForServer`, `clearLibraryPreferencesForServerEverywhere`, 8 private helpers)
+- [x] **P4** — Cache `SharedPreferences` instance in `VidyaPlaybackTracker` via `_getPrefs()` (was calling `SharedPreferences.getInstance()` on every 15-second timer tick during network failure)
+- [ ] **Backlog** — Redundant `fetchCourseWithContent()` in `VidyaLectureResources` + `VidyaCoursePanel` when both mounted simultaneously (dormant — `VidyaPlayerScreen` is dead code and not routed to)
+
+---
+
 ## Future / Backlog
 
+- Set up local APK compilation (requires Android SDK CLI tools + JDK 17 — see CLAUDE.md)
 - Token refresh flow in `VidyaApiClient` — refresh JWT automatically when 401 received during playback
 - D-pad seek-bar scrubbing — hold Left/Right to skip in larger increments
 - Subtitle track selection for VIDYA lectures (SRT → WebVTT served by server)
 - Resume-from-last-position on launch — use `watch_time` from outline to seek on `_initVideo`
 - Connection health check / reconnect screen on network loss mid-playback
+- Eliminate dead code: `VidyaPlayerScreen`, `VidyaCoursePanel`, `VidyaLectureResources` (unreachable from current navigation)
