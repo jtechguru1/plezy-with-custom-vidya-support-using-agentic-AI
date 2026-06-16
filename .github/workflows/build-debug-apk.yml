@@ -36,6 +36,28 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
+      - name: Setup debug keystore
+        env:
+          ANDROID_DEBUG_KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+        run: |
+          mkdir -p ~/.android
+          if [ -n "$ANDROID_DEBUG_KEYSTORE" ]; then
+            echo "$ANDROID_DEBUG_KEYSTORE" | base64 -d > ~/.android/debug.keystore
+            echo "✅ Using keystore from secret ANDROID_DEBUG_KEYSTORE"
+          else
+            keytool -genkey -v \
+              -keystore ~/.android/debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+            echo "⚠️ No ANDROID_DEBUG_KEYSTORE secret found — generated a new one."
+            echo "Add the following as a GitHub secret named ANDROID_DEBUG_KEYSTORE to lock the signature across builds:"
+            echo '```'
+            base64 -w 0 ~/.android/debug.keystore
+            echo '```'
+          fi >> $GITHUB_STEP_SUMMARY
+
       - name: Install dependencies
         run: flutter pub get --no-example
 
