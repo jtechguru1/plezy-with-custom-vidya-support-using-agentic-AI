@@ -1,6 +1,6 @@
 # Plezy — Roadmap
 
-> Last updated: 2026-06-16 — Performance regression audit complete; all Priority 1–4 fixes applied
+> Last updated: 2026-06-16 — Dead legacy player cluster removed (VidyaPlayerScreen, VidyaCoursePanel, VidyaLectureResources)
 
 ---
 
@@ -125,7 +125,7 @@
 - [x] **P2** — Add 30-second TTL cache + in-flight deduplication to `VidyaMediaServerClient._fetchHome()` (was firing two serial uncached HTTP requests per home refresh)
 - [x] **P3** — Restore `profile_connection_cleanup.dart` and startup `pruneUnreferencedJellyfinConnections()` call; port missing `StorageService` server-cleanup helpers (`clearLibraryPreferencesForServer`, `clearLibraryPreferencesForServerEverywhere`, 8 private helpers)
 - [x] **P4** — Cache `SharedPreferences` instance in `VidyaPlaybackTracker` via `_getPrefs()` (was calling `SharedPreferences.getInstance()` on every 15-second timer tick during network failure)
-- [ ] **Backlog** — Redundant `fetchCourseWithContent()` in `VidyaLectureResources` + `VidyaCoursePanel` when both mounted simultaneously (dormant — `VidyaPlayerScreen` is dead code and not routed to)
+- [x] **Backlog** — Redundant `fetchCourseWithContent()` in `VidyaLectureResources` + `VidyaCoursePanel` resolved by deleting the dead files entirely
 
 ---
 
@@ -137,4 +137,4 @@
 - Subtitle track selection for VIDYA lectures (SRT → WebVTT served by server)
 - Resume-from-last-position on launch — use `watch_time` from outline to seek on `_initVideo`
 - Connection health check / reconnect screen on network loss mid-playback
-- Eliminate dead code: `VidyaPlayerScreen`, `VidyaCoursePanel`, `VidyaLectureResources` (unreachable from current navigation)
+- ~~Eliminate dead code: `VidyaPlayerScreen`, `VidyaCoursePanel`, `VidyaLectureResources`~~ — Done

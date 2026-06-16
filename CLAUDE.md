@@ -1,6 +1,6 @@
 # CLAUDE.md — Plezy (with VIDYA support)
 
-> Last updated: 2026-06-16 — Performance regression audit complete (commit df2c3047)
+> Last updated: 2026-06-16 — Dead legacy player cluster deleted; Vidya backend dead routes removed
 
 ---
 
@@ -88,10 +88,7 @@ When `videoPosition ≥ videoDuration − 500 ms`:
 | File | Purpose |
 |------|---------|
 | `lib/screens/vidya_course_player_view.dart` | **Current** VIDYA player — Udemy-style split layout, sidebar, auto-next |
-| `lib/screens/vidya_player_screen.dart` | Legacy VIDYA player — kept for reference, no longer routed to |
 | `lib/screens/vidya_course_browser_screen.dart` | Course browser → pushes `VidyaCoursePlayerView` |
-| `lib/widgets/video_controls/widgets/vidya_course_panel.dart` | Original in-player panel (Course Content + User Uploads tabs) — not used by new player |
-| `lib/widgets/video_controls/widgets/vidya_lecture_resources.dart` | Original resources strip — not used by new player |
 | `lib/services/vidya_api_client.dart` | HTTP client: `VidyaApiClient` (session-scoped) + `VidyaBrowseClient` (browse + outline) |
 | `lib/services/vidya_connection.dart` | `VidyaPlaybackSession` model |
 | `lib/services/vidya_progress_tracker.dart` | Heartbeat tracker + offline queue |
