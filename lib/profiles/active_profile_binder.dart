@@ -320,8 +320,8 @@ class ActiveProfileBinder {
           expected.addAll(servers.map((server) => server.clientIdentifier));
         case JellyfinConnection(:final serverMachineId):
           expected.add(serverMachineId);
-        case VidyaAccountConnection():
-          break;
+        case VidyaAccountConnection(:final id):
+          expected.add(id);
         case null:
           break;
       }
@@ -486,7 +486,8 @@ class ActiveProfileBinder {
           expected.add(conn.serverMachineId);
           futures.add(_bindJellyfin(conn));
         case VidyaAccountConnection():
-          break;
+          expected.add(conn.id);
+          futures.add(_bindVidya(conn));
       }
     }
     final results = await Future.wait(futures);
@@ -865,6 +866,14 @@ class ActiveProfileBinder {
       return _ProfileBindResult.visible({conn.serverMachineId});
     }
     return _ProfileBindResult(visibleServerIds: const {}, expectedServerIds: {conn.serverMachineId});
+  }
+
+  Future<_ProfileBindResult> _bindVidya(VidyaAccountConnection conn) async {
+    final ok = await serverManager.addVidyaConnection(conn, connections);
+    if (ok || serverManager.authErrorServerIds.contains(conn.id)) {
+      return _ProfileBindResult.visible({conn.id});
+    }
+    return _ProfileBindResult(visibleServerIds: const {}, expectedServerIds: {conn.id});
   }
 
   Future<PlexAuthService> _ensureAuth() async {

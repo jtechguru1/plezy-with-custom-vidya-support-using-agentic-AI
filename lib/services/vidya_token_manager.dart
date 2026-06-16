@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../connection/connection.dart';
 import '../connection/connection_registry.dart';
+import 'vidya_connection.dart';
 
 /// Wraps HTTP requests for VIDYA with automatic JWT refresh.
 ///
@@ -18,7 +19,7 @@ import '../connection/connection_registry.dart';
 class VidyaTokenManager {
   final String baseUrl;
   final String _connectionId;
-  final ConnectionRegistry _registry;
+  final ConnectionRegistry? _registry;
 
   String _accessToken;
   String _refreshToken;
@@ -30,7 +31,7 @@ class VidyaTokenManager {
     required String connectionId,
     required String accessToken,
     required String refreshToken,
-    required ConnectionRegistry registry,
+    ConnectionRegistry? registry,
   })  : _connectionId = connectionId,
         _accessToken = accessToken,
         _refreshToken = refreshToken,
@@ -46,6 +47,18 @@ class VidyaTokenManager {
       accessToken: connection.accessToken,
       refreshToken: connection.refreshToken,
       registry: registry,
+    );
+  }
+
+  /// Creates a token manager for playback contexts where token persistence is
+  /// not needed (e.g., [VidyaCoursePlayerView] outline fetch). Refresh still
+  /// works — updated tokens just aren't saved back to the registry.
+  factory VidyaTokenManager.fromSession(VidyaPlaybackSession session) {
+    return VidyaTokenManager(
+      baseUrl: session.baseUrl,
+      connectionId: '',
+      accessToken: session.token,
+      refreshToken: '',
     );
   }
 
@@ -90,13 +103,15 @@ class VidyaTokenManager {
     _accessToken = newAccessToken;
     if (newRefreshToken.isNotEmpty) _refreshToken = newRefreshToken;
 
-    final existing = await _registry.get(_connectionId);
-    if (existing is VidyaAccountConnection) {
-      await _registry.upsert(existing.copyWith(
-        accessToken: _accessToken,
-        refreshToken: _refreshToken,
-        lastAuthenticatedAt: DateTime.now(),
-      ));
+    if (_registry != null && _connectionId.isNotEmpty) {
+      final existing = await _registry.get(_connectionId);
+      if (existing is VidyaAccountConnection) {
+        await _registry.upsert(existing.copyWith(
+          accessToken: _accessToken,
+          refreshToken: _refreshToken,
+          lastAuthenticatedAt: DateTime.now(),
+        ));
+      }
     }
   }
 }

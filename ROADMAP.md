@@ -1,6 +1,6 @@
 # Plezy — Roadmap
 
-> Last updated: 2026-06-16 — Feature Verticals 2 & 3 complete
+> Last updated: 2026-06-16 — Feature Vertical 4 complete (VIDYA on home screen)
 
 ---
 
@@ -21,6 +21,7 @@
 | Initial VIDYA Integration | ✅ Complete | VidyaAccountConnection, browser, legacy player |
 | Feature Vertical 2 | ✅ Complete | VidyaPlaybackTracker — heartbeat + offline queue |
 | Feature Vertical 3 | ✅ Complete | VidyaCoursePlayerView — Udemy-style split player |
+| Feature Vertical 4 | ✅ Complete | VIDYA courses on home screen — JWT auto-refresh, MediaServerClient, home endpoint |
 
 ---
 

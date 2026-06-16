@@ -1,6 +1,6 @@
 # CLAUDE.md — Plezy (with VIDYA support)
 
-> Last updated: 2026-06-16 — Feature Verticals 2 & 3 complete
+> Last updated: 2026-06-16 — Feature Vertical 4 complete (VIDYA on home screen)
 
 ---
 
@@ -96,6 +96,11 @@ When `videoPosition ≥ videoDuration − 500 ms`:
 | `lib/services/vidya_progress_tracker.dart` | Heartbeat tracker + offline queue |
 | `lib/connection/connection.dart` | `VidyaAccountConnection` sealed class |
 | `lib/screens/settings/add_vidya_screen.dart` | Add-connection form → `POST /api/auth/token` |
+| `lib/services/vidya_media_server_client.dart` | `MediaServerClient` stub for VIDYA — wires into `DataAggregationService` for home screen |
+| `lib/services/vidya_token_manager.dart` | JWT auto-refresh wrapper; `fromConnection(conn, registry)` for browse/home; `fromSession(session)` for player |
+| `lib/services/multi_server_manager.dart` | `addVidyaConnection(conn, registry)` / `removeVidyaConnection(conn)` |
+| `lib/profiles/active_profile_binder.dart` | `_bindVidya(conn)` called for `VidyaAccountConnection` on profile activation |
+| `lib/utils/media_navigation_helper.dart` | VIDYA intercept before kind-switch: episode → player with resume, show → course browser |
 
 ---
 
@@ -106,6 +111,7 @@ When `videoPosition ≥ videoDuration − 500 ms`:
 | `POST /api/auth/token` | `AddVidyaScreen` directly | Returns `{ token, user }` |
 | `GET /api/course` | `VidyaBrowseClient.fetchCourses()` | All courses list |
 | `GET /api/course/:courseId` | `VidyaBrowseClient.fetchCourseDetail()` | Course + sections + lectures (no progress) |
+| `GET /api/v1/home` | `VidyaMediaServerClient.fetchContinueWatching()` / `fetchGlobalHubs()` | Home screen data: in-progress lectures + all courses hub |
 | `GET /api/v1/courses/:courseId/outline` | `VidyaBrowseClient.fetchOutline()` | Course + sections + lessons + per-user progress + attachments |
 | `GET /api/course/stream/:lectureId?token=` | Stream URL passed to `VideoPlayerController.networkUrl()` | Range requests, token in query string |
 | `POST /api/course/player` | `VidyaApiClient.fetchCourseWithContent()` | Includes `content` array per lecture |
@@ -130,9 +136,10 @@ VidyaAccountConnection (persisted in Drift `connections` table, kind = 'vidya')
 
 VidyaPlaybackSession (ephemeral, in-memory only)
   ├── baseUrl
-  ├── token       = VidyaAccountConnection.accessToken
+  ├── token                = VidyaAccountConnection.accessToken
   ├── courseId
-  └── lectureId
+  ├── lectureId
+  └── resumePositionSeconds  (seconds to seek on first load; 0 = start from beginning)
 ```
 
 ---

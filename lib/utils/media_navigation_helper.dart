@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../connection/connection.dart';
+import '../connection/connection_registry.dart';
 import '../i18n/strings.g.dart';
 import '../media/ids.dart';
+import '../media/media_backend.dart';
 import '../media/media_item.dart';
 import '../media/media_item_types.dart';
 import '../media/media_kind.dart';
@@ -9,7 +13,10 @@ import '../screens/collection_detail_screen.dart';
 import '../screens/main_screen.dart';
 import '../screens/media_detail_screen.dart';
 import '../screens/playlist/playlist_detail_screen.dart';
+import '../screens/vidya_course_browser_screen.dart';
+import '../screens/vidya_course_player_view.dart';
 import '../services/settings_service.dart';
+import '../services/vidya_connection.dart';
 import '../utils/global_key_utils.dart';
 import 'plex_library_section_helpers.dart';
 import 'video_player_navigation.dart';
@@ -173,6 +180,12 @@ Future<MediaNavigationResult> navigateToMediaItem(
     return MediaNavigationResult.unsupported;
   }
 
+  // VIDYA items route to their own screens before reaching any Plex/Jellyfin
+  // playback code.
+  if (mi.backend == MediaBackend.vidya && mi.serverId != null) {
+    return _navigateToVidyaItem(context, mi, playDirectly: playDirectly);
+  }
+
   switch (mi.kind) {
     case MediaKind.collection:
       final result = await Navigator.push<bool>(
@@ -218,6 +231,54 @@ Future<MediaNavigationResult> navigateToMediaItem(
     default:
       return navigateToMediaItemDetails(context, mi, isOffline: isOffline, onRefresh: onRefresh);
   }
+}
+
+/// Routes a VIDYA [MediaItem] to the appropriate VIDYA-specific screen.
+///
+/// [MediaKind.show] → [VidyaCourseBrowserScreen] for the full course outline.
+/// [MediaKind.episode] → [VidyaCoursePlayerView] with resume position from
+///   [MediaItem.viewOffsetMs].
+Future<MediaNavigationResult> _navigateToVidyaItem(
+  BuildContext context,
+  MediaItem mi, {
+  bool playDirectly = false,
+}) async {
+  final registry = context.read<ConnectionRegistry>();
+  final raw = await registry.get(mi.serverId!);
+  if (raw is! VidyaAccountConnection) return MediaNavigationResult.unsupported;
+  final connection = raw;
+
+  if (mi.kind == MediaKind.episode) {
+    final courseId = mi.grandparentId ?? '';
+    final lectureId = mi.id;
+    final resumeSeconds = ((mi.viewOffsetMs ?? 0) / 1000).round();
+    final session = VidyaPlaybackSession(
+      baseUrl: connection.baseUrl,
+      token: connection.accessToken,
+      courseId: courseId,
+      lectureId: lectureId,
+      resumePositionSeconds: resumeSeconds,
+    );
+    if (!context.mounted) return MediaNavigationResult.navigated;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VidyaCoursePlayerView(
+          session: session,
+          initialLectureTitle: mi.title ?? '',
+        ),
+      ),
+    );
+    return MediaNavigationResult.navigated;
+  }
+
+  // show / anything else → course browser
+  if (!context.mounted) return MediaNavigationResult.navigated;
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => VidyaCourseBrowserScreen(connection: connection),
+    ),
+  );
+  return MediaNavigationResult.navigated;
 }
 
 Future<MediaNavigationResult> navigateToMediaItemDetails(

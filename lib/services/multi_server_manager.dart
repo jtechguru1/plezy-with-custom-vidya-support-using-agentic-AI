@@ -5,10 +5,13 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../connection/connection.dart';
+import '../connection/connection_registry.dart';
 import '../media/media_server_client.dart';
 import 'jellyfin_client.dart';
 import 'jellyfin_endpoint_discovery.dart';
 import 'plex_client.dart';
+import 'vidya_media_server_client.dart';
+import 'vidya_token_manager.dart';
 import '../models/plex/plex_config.dart';
 import '../utils/app_logger.dart';
 import '../utils/media_server_timeouts.dart';
@@ -659,6 +662,41 @@ class MultiServerManager {
       _authErrorServers.remove(machineId);
       _statusController.add(Map.from(_serverStatus));
     }
+  }
+
+  /// Register a VIDYA server connection. Creates a [VidyaMediaServerClient],
+  /// runs a health probe, and registers it in the manager. Returns true when
+  /// the server is reachable; false on network/auth failure (the client is
+  /// still registered so the offline banner surfaces it).
+  Future<bool> addVidyaConnection(
+    VidyaAccountConnection connection,
+    ConnectionRegistry registry,
+  ) async {
+    final serverId = connection.id;
+    try {
+      final tokenManager = VidyaTokenManager.fromConnection(connection, registry);
+      final client = VidyaMediaServerClient(connection, tokenManager);
+      final oldClient = _clients[serverId];
+      if (oldClient != null) _closeClient(oldClient);
+      _clients[serverId] = client;
+      final health = await client.checkHealth();
+      _applyHealth(ServerId(serverId), health);
+      appLogger.i('Added VIDYA server: ${connection.serverName ?? serverId}${health == HealthStatus.online ? '' : ' (unhealthy)'}');
+      if (_connectivitySubscription == null && health == HealthStatus.online) {
+        _startNetworkMonitoring();
+      }
+      return health == HealthStatus.online;
+    } catch (e, stackTrace) {
+      appLogger.e('Failed to add VIDYA server ${connection.serverName}', error: e, stackTrace: stackTrace);
+      _serverStatus[serverId] = false;
+      _statusController.add(Map.from(_serverStatus));
+      return false;
+    }
+  }
+
+  /// Tear down a VIDYA server connection.
+  void removeVidyaConnection(VidyaAccountConnection connection) {
+    removeServer(ServerId(connection.id));
   }
 
   /// Update server status (used for health monitoring).

@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import '../services/vidya_api_client.dart';
 import '../services/vidya_connection.dart';
 import '../services/vidya_progress_tracker.dart';
+import '../services/vidya_token_manager.dart';
 
 // ── Domain model ──────────────────────────────────────────────────────────────
 
@@ -144,8 +145,7 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
 
   Future<void> _loadOutline() async {
     final client = VidyaBrowseClient(
-      baseUrl: widget.session.baseUrl,
-      accessToken: widget.session.token,
+      VidyaTokenManager.fromSession(widget.session),
     );
     try {
       final outline = await client.fetchOutline(widget.session.courseId);
@@ -200,6 +200,10 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
     try {
       await ctrl.initialize();
       ctrl.addListener(_onControllerValue);
+      // Seek to resume position on the initial lecture only.
+      if (lectureId == widget.session.lectureId && widget.session.resumePositionSeconds > 0) {
+        await ctrl.seekTo(Duration(seconds: widget.session.resumePositionSeconds));
+      }
       await ctrl.play();
       if (!mounted) {
         await ctrl.dispose();
