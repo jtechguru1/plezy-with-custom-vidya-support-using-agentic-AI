@@ -86,6 +86,36 @@
 
 ---
 
+## Feature Vertical 4 — Test Checklist
+
+### Home screen
+- [ ] VIDYA courses appear in a "Continue Watching" row (lectures started but not finished)
+- [ ] VIDYA courses appear in a hub row (all courses)
+- [ ] Thumbnails load correctly
+- [ ] Plex/Jellyfin rows are unaffected
+
+### Navigation from home screen
+- [ ] Tapping a course hub item (show) → opens `VidyaCourseBrowserScreen`
+- [ ] Tapping a continue-watching lecture (episode) → opens `VidyaCoursePlayerView` directly
+- [ ] Resume position: a mid-way lecture seeks to where you left off
+
+### Player regression
+- [ ] Playback starts correctly
+- [ ] Sidebar opens/closes with D-pad Right/Left
+- [ ] Auto-advance to next lecture works
+- [ ] Progress syncs back to the server (heartbeat + on pause)
+
+### Edge cases
+- [ ] No VIDYA server added → home screen shows only Plex/Jellyfin, no crash
+- [ ] VIDYA server offline → home screen loads gracefully, other backends still work
+- [ ] Token expired → auto-refresh fires and content loads after re-auth
+
+### Plex/Jellyfin regression
+- [ ] Home screen rows, playback, and navigation unchanged
+- [ ] Plex/Jellyfin items unaffected by VIDYA intercept in `media_navigation_helper.dart`
+
+---
+
 ## Future / Backlog
 
 - Token refresh flow in `VidyaApiClient` — refresh JWT automatically when 401 received during playback
