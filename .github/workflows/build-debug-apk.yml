@@ -42,7 +42,7 @@ jobs:
         run: |
           mkdir -p ~/.android
           if [ -n "$ANDROID_DEBUG_KEYSTORE" ]; then
-            echo "$ANDROID_DEBUG_KEYSTORE" | base64 -d > ~/.android/debug.keystore
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE" | tr -d '[:space:]' | base64 -d > ~/.android/debug.keystore
             echo "✅ Using keystore from secret ANDROID_DEBUG_KEYSTORE"
           else
             keytool -genkey -v \
