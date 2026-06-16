@@ -98,7 +98,7 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
 
   // ── UI state ─────────────────────────────────────────────────────────────
   bool _showControls = true;
-  bool _sidebarVisible = false;
+  bool _sidebarVisible = true;
   Timer? _hideTimer;
 
   // ── Focus ────────────────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
           sectionTitle: sectionTitle,
           type: lesson['type'] as String? ?? 'video',
           duration: (lesson['duration'] as num?)?.toDouble() ?? 0.0,
-          isCompleted: lesson['is_completed'] as bool? ?? false,
+          isCompleted: lesson['is_completed'] == true,
           attachments: rawAttachments
               .map((a) => _Attachment(
                     name: a['name'] as String? ?? 'File',
@@ -326,21 +326,22 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowRight:
-        if (!_sidebarVisible) {
-          setState(() => _sidebarVisible = true);
-        }
-        _sidebarScope.requestFocus();
+        _seek(_seekStep);
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowDown:
-        // Down: ensure controls are visible (progress bar).
         setState(() => _showControls = true);
         _resetHideTimer();
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowUp:
-        setState(() => _showControls = false);
-        _hideTimer?.cancel();
+        // Up: move focus to sidebar for lesson navigation.
+        if (_sidebarVisible) {
+          _sidebarScope.requestFocus();
+        } else {
+          setState(() => _showControls = false);
+          _hideTimer?.cancel();
+        }
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.goBack:
@@ -353,10 +354,8 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
 
   KeyEventResult _handleSidebarKey(FocusNode _, KeyEvent event) {
     if (event is KeyUpEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-        event.logicalKey == LogicalKeyboardKey.goBack ||
+    if (event.logicalKey == LogicalKeyboardKey.goBack ||
         event.logicalKey == LogicalKeyboardKey.escape) {
-      setState(() => _sidebarVisible = false);
       _videoFocus.requestFocus();
       return KeyEventResult.handled;
     }
@@ -390,9 +389,9 @@ class _VidyaCoursePlayerViewState extends State<VidyaCoursePlayerView> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Left / Center: video + controls (80% when sidebar open, 100% when closed)
+            // Left / Center: video + controls (75% when sidebar open, 100% when closed)
             Expanded(
-              flex: _sidebarVisible ? 4 : 1,
+              flex: _sidebarVisible ? 3 : 1,
               child: Focus(
                 focusNode: _videoFocus,
                 autofocus: true,
