@@ -89,6 +89,7 @@ class _AddVidyaScreenState extends State<AddVidyaScreen> with AsyncFormStateMixi
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         final token = json['token'] as String? ?? '';
         if (token.isEmpty) throw Exception('No token in response');
+        final refreshToken = json['refreshToken'] as String? ?? '';
 
         final user = json['user'] as Map<String, dynamic>? ?? {};
         final userId = (user['id'] ?? '').toString();
@@ -104,6 +105,7 @@ class _AddVidyaScreenState extends State<AddVidyaScreen> with AsyncFormStateMixi
           userId: userId,
           userName: userName,
           accessToken: token,
+          refreshToken: refreshToken,
           createdAt: now,
           lastAuthenticatedAt: now,
         );

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'vidya_connection.dart';
+import 'vidya_token_manager.dart';
 
 class VidyaApiClient {
   final VidyaPlaybackSession connection;
@@ -88,21 +89,22 @@ class VidyaApiClient {
 }
 
 /// Lightweight client for browsing VIDYA courses before a playback session
-/// is established. Uses [VidyaAccountConnection] credentials.
+/// is established. Uses [VidyaTokenManager] for automatic token refresh.
 class VidyaBrowseClient {
-  final String baseUrl;
-  final String accessToken;
+  final VidyaTokenManager _tokenManager;
 
-  const VidyaBrowseClient({required this.baseUrl, required this.accessToken});
+  VidyaBrowseClient(this._tokenManager);
 
-  Map<String, String> get _headers => {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      };
+  String get baseUrl => _tokenManager.baseUrl;
+
+  /// The current access token — always reflects the latest refreshed value.
+  /// Use this when building a [VidyaPlaybackSession] so the session starts
+  /// with a valid token even after a silent refresh.
+  String get accessToken => _tokenManager.accessToken;
 
   Future<List<Map<String, dynamic>>> fetchCourses() async {
     final uri = Uri.parse('$baseUrl/api/course');
-    final response = await http.get(uri, headers: _headers);
+    final response = await _tokenManager.get(uri);
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch courses: ${response.statusCode}');
     }
@@ -111,7 +113,7 @@ class VidyaBrowseClient {
 
   Future<Map<String, dynamic>> fetchCourseDetail(String courseId) async {
     final uri = Uri.parse('$baseUrl/api/course/$courseId');
-    final response = await http.get(uri, headers: _headers);
+    final response = await _tokenManager.get(uri);
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch course: ${response.statusCode}');
     }
@@ -119,13 +121,12 @@ class VidyaBrowseClient {
   }
 
   String streamUrl(String lectureId) =>
-      '$baseUrl/api/course/stream/$lectureId?token=$accessToken';
+      '$baseUrl/api/course/stream/$lectureId?token=${_tokenManager.accessToken}';
 
   /// Fetches the full course outline with per-user completion state.
-  /// Used by [VidyaCoursePlayerView] to populate the sidebar.
   Future<Map<String, dynamic>> fetchOutline(String courseId) async {
     final uri = Uri.parse('$baseUrl/api/v1/courses/$courseId/outline');
-    final response = await http.get(uri, headers: _headers);
+    final response = await _tokenManager.get(uri);
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch outline: ${response.statusCode}');
     }

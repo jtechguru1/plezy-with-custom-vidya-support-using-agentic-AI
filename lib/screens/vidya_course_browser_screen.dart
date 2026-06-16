@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:provider/provider.dart';
 
 import '../connection/connection.dart';
+import '../connection/connection_registry.dart';
 import '../focus/focusable_button.dart';
 import '../services/vidya_api_client.dart';
 import '../services/vidya_connection.dart';
+import '../services/vidya_token_manager.dart';
 import '../widgets/focused_scroll_scaffold.dart';
 import 'vidya_course_player_view.dart';
 
@@ -34,9 +37,9 @@ class _VidyaCourseBrowserScreenState extends State<VidyaCourseBrowserScreen> {
   @override
   void initState() {
     super.initState();
+    final registry = context.read<ConnectionRegistry>();
     _client = VidyaBrowseClient(
-      baseUrl: widget.connection.baseUrl,
-      accessToken: widget.connection.accessToken,
+      VidyaTokenManager.fromConnection(widget.connection, registry),
     );
     unawaited(_load());
   }
@@ -232,7 +235,7 @@ class _VidyaCourseDetailScreenState extends State<VidyaCourseDetailScreen> {
   Future<void> _playLecture(String courseId, String lectureId, String lectureName) async {
     final session = VidyaPlaybackSession(
       baseUrl: widget.connection.baseUrl,
-      token: widget.connection.accessToken,
+      token: widget.client.accessToken,
       courseId: courseId,
       lectureId: lectureId,
     );

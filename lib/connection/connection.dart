@@ -394,8 +394,12 @@ class VidyaAccountConnection extends Connection {
   /// Authenticated user's display name.
   final String userName;
 
-  /// JWT access token from `/api/auth/token`.
+  /// JWT access token from `/api/auth/token` (1-hour lifetime).
   final String accessToken;
+
+  /// Opaque refresh token (60-day lifetime). Used by [VidyaTokenManager] to
+  /// silently obtain a new [accessToken] without re-entering credentials.
+  final String refreshToken;
 
   VidyaAccountConnection({
     required this.id,
@@ -404,6 +408,7 @@ class VidyaAccountConnection extends Connection {
     required this.userId,
     required this.userName,
     required this.accessToken,
+    this.refreshToken = '',
     this.status = ConnectionStatus.unknown,
     required this.createdAt,
     this.lastAuthenticatedAt,
@@ -433,6 +438,7 @@ class VidyaAccountConnection extends Connection {
     String? userId,
     String? userName,
     String? accessToken,
+    String? refreshToken,
     ConnectionStatus? status,
     DateTime? createdAt,
     DateTime? lastAuthenticatedAt,
@@ -444,6 +450,7 @@ class VidyaAccountConnection extends Connection {
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,
       accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       lastAuthenticatedAt: lastAuthenticatedAt ?? this.lastAuthenticatedAt,
@@ -458,6 +465,7 @@ class VidyaAccountConnection extends Connection {
       'userId': userId,
       'userName': userName,
       'accessToken': accessToken,
+      'refreshToken': refreshToken,
     };
   }
 
@@ -475,6 +483,7 @@ class VidyaAccountConnection extends Connection {
       userId: json['userId'] as String? ?? '',
       userName: json['userName'] as String? ?? '',
       accessToken: json['accessToken'] as String? ?? '',
+      refreshToken: json['refreshToken'] as String? ?? '',
       status: status,
       createdAt: createdAt,
       lastAuthenticatedAt: lastAuthenticatedAt,
