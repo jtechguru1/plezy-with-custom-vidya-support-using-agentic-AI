@@ -288,9 +288,13 @@ extension _PlexVideoControlsVisibilityMethods on _PlexVideoControlsState {
     if (sheetOpen) return;
     _focusNode.requestFocus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_focusNode.hasPrimaryFocus) {
-        _focusNode.requestFocus();
-      }
+      if (!mounted) return;
+      if (!_focusNode.hasPrimaryFocus) _focusNode.requestFocus();
+      // Chain a second callback so the reclaim survives any provider-driven
+      // rebuild that may be scheduled behind this frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_focusNode.hasPrimaryFocus) _focusNode.requestFocus();
+      });
     });
   }
 

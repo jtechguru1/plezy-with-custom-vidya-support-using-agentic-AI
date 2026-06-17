@@ -8,7 +8,7 @@ extension _PlexVideoControlsNavigationMethods on _PlexVideoControlsState {
       onToggleAlwaysOnTop: Platform.isMacOS ? null : _toggleAlwaysOnTop,
     );
     final useDpad = _videoPlayerNavigationEnabled || PlatformDetector.isTV();
-    final vidyaConnection = context.watch<VidyaSessionProvider>().connection;
+    final vidyaConnection = context.read<VidyaSessionProvider>().connection;
 
     return Listener(
       behavior: HitTestBehavior.translucent,

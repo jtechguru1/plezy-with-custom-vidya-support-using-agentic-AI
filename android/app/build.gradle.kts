@@ -33,10 +33,11 @@ val extractMpvLibcxx by tasks.registering {
   outputs.dir(outDir)
   doLast {
     outDir.deleteRecursively() // drop stale ABIs from a previous AAR version
-    outDir.mkdirs()
-    exec {
-      commandLine("unzip", "-q", "-o", aar.absolutePath,
-        "jni/*/libc++_shared.so", "-d", outDir.absolutePath)
+    project.copy {
+      from(project.zipTree(aar)) {
+        include("jni/*/libc++_shared.so")
+      }
+      into(outDir)
     }
   }
 }
@@ -133,10 +134,11 @@ android {
     release {
       // Only use release signing if key.properties exists (not in CI/CD)
       val keystorePropertiesFile = rootProject.file("key.properties")
-      if (keystorePropertiesFile.exists()) {
-        signingConfig = signingConfigs.getByName("release")
+      signingConfig = if (keystorePropertiesFile.exists()) {
+        signingConfigs.getByName("release")
+      } else {
+        signingConfigs.getByName("debug")
       }
-      // If key.properties doesn't exist, it will use debug signing for CI builds
       ndk {
         debugSymbolLevel = "FULL"
       }

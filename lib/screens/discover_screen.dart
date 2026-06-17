@@ -122,7 +122,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // Hub navigation keys
   GlobalKey<HubSectionState>? _continueWatchingHubKey;
   GlobalKey<HubSectionState>? _vidyaContinueLearningHubKey;
-  bool _hasVidyaOnDeck = false;
+  bool get _hasVidyaOnDeck => _onDeck.any((item) => item.serverId?.startsWith('vidya-') == true);
   final Map<String, GlobalKey<HubSectionState>> _hubKeysByIdentity = {};
   List<GlobalKey<HubSectionState>> _orderedHubKeys = const [];
   final _tvBrowseRailKey = GlobalKey<TvBrowseRailState>();
@@ -167,7 +167,6 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _orderedHubKeys = ordered;
     _continueWatchingHubKey ??= GlobalKey<HubSectionState>();
     _vidyaContinueLearningHubKey ??= GlobalKey<HubSectionState>();
-    _hasVidyaOnDeck = _onDeck.any((item) => item.serverId?.startsWith('vidya-') == true);
   }
 
   /// Hub keys in rendered order: [non-Vidya CW?] [non-Vidya hubs] [Vidya CL?] [Vidya hubs]

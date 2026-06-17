@@ -64,6 +64,9 @@ class MultiServerManager {
   /// Connectivity subscription for network monitoring
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
+  /// Periodic retry timer for VIDYA servers that were offline at startup.
+  Timer? _vidyaRetryTimer;
+
   /// Map of serverId to active optimization futures
   final Map<String, Future<void>> _activeOptimizations = {};
 
@@ -682,6 +685,7 @@ class MultiServerManager {
       final health = await client.checkHealth();
       _applyHealth(ServerId(serverId), health);
       appLogger.i('Added VIDYA server: ${connection.serverName ?? serverId}${health == HealthStatus.online ? '' : ' (unhealthy)'}');
+      _scheduleVidyaRetryIfNeeded();
       if (_connectivitySubscription == null && health == HealthStatus.online) {
         _startNetworkMonitoring();
       }
@@ -692,6 +696,52 @@ class MultiServerManager {
       _statusController.add(Map.from(_serverStatus));
       return false;
     }
+  }
+
+  /// Start a 30-second periodic health-check for any VIDYA servers that are
+  /// currently offline. When a server recovers, [_applyHealth] fires
+  /// [_statusController] which propagates the "online" state to the home
+  /// screen so the "Continue Learning" row reappears without a restart.
+  /// The timer self-cancels once all VIDYA servers are online.
+  void _scheduleVidyaRetryIfNeeded() {
+    final hasOffline = _clients.entries.any(
+      (e) => e.value is VidyaMediaServerClient && _serverStatus[e.key] != true,
+    );
+    if (!hasOffline) {
+      _vidyaRetryTimer?.cancel();
+      _vidyaRetryTimer = null;
+      return;
+    }
+    if (_vidyaRetryTimer != null) return; // already running
+    _vidyaRetryTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      final offline = _clients.entries
+          .where((e) => e.value is VidyaMediaServerClient && _serverStatus[e.key] != true)
+          .toList();
+      if (offline.isEmpty) {
+        _vidyaRetryTimer?.cancel();
+        _vidyaRetryTimer = null;
+        return;
+      }
+      for (final entry in offline) {
+        try {
+          final status = await entry.value.checkHealth();
+          _applyHealth(ServerId(entry.key), status);
+          if (status == HealthStatus.online) {
+            appLogger.i('VIDYA server ${entry.key} recovered — Continue Learning row restored');
+          }
+        } catch (e) {
+          // Remain offline until the next tick
+        }
+      }
+      // Self-cancel when all VIDYA servers are back online
+      final stillOffline = _clients.entries.any(
+        (e) => e.value is VidyaMediaServerClient && _serverStatus[e.key] != true,
+      );
+      if (!stillOffline) {
+        _vidyaRetryTimer?.cancel();
+        _vidyaRetryTimer = null;
+      }
+    });
   }
 
   /// Tear down a VIDYA server connection.
@@ -1115,6 +1165,8 @@ class MultiServerManager {
   }
 
   Set<MediaServerClient> _detachAllClients() {
+    _vidyaRetryTimer?.cancel();
+    _vidyaRetryTimer = null;
     _stopNetworkMonitoring();
     for (final timer in _reconnectDebounce.values) {
       timer.cancel();
