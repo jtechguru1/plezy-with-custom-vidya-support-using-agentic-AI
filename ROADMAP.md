@@ -1,6 +1,6 @@
 # Plezy — Roadmap
 
-> Last updated: 2026-06-16 — Phase 1a complete: home screen rewiring, Vidya server naming
+> Last updated: 2026-06-17 — Post-Phase-1a bug fix session (Round 1–3; two fixes pending)
 
 ---
 
@@ -24,6 +24,7 @@
 | Feature Vertical 4 | ✅ Complete | VIDYA courses on home screen — JWT auto-refresh, MediaServerClient, home endpoint |
 | Performance Regression Audit | ✅ Complete | Full regressive audit vs original repo; 4 regressions identified and fixed (see `audit.md`) |
 | Phase 1a — Home Screen Rewiring & Server Naming | ✅ Complete | Dedicated Vidya rows on Discover screen; custom server name API + admin UI |
+| Post-Phase-1a Bug Fixes | 🔄 In Progress | 4 of 6 fixes landed; 2 pending (visibility.dart loop, discover_provider merge) |
 
 ---
 
@@ -159,9 +160,37 @@
 
 ---
 
+## Post-Phase-1a Bug Fixes `in progress`
+
+> Three diagnostic rounds on device (onn 4K Pro, wireless ADB). Bugs diagnosed after APK install and live testing.
+
+### Build System (completed)
+- [x] **`build.gradle.kts` release signing fallback** — Newer AGP no longer auto-falls-back to debug signing when `key.properties` absent; explicit `signingConfigs.getByName("debug")` fallback added. Fixed `INSTALL_PARSE_FAILED_NO_CERTIFICATES`.
+- [x] **`extractMpvLibcxx` Windows fix** — `commandLine("unzip", ...)` fails in Windows JVM (no `unzip` on PATH). Replaced with `project.copy { from(project.zipTree(aar)) { include("jni/*/libc++_shared.so") } into(outDir) }`.
+- [x] **Fat APK ABI targeting** — Device loads 32-bit armeabi-v7a despite 64-bit hardware. Build must include `--target-platform android-arm,android-arm64`.
+
+### Back-Button Regression — Round 1 (completed)
+- [x] **`_pauseAndHidePlayerForRouteExit()` restored** (`lib/screens/video_player_screen.dart`) — Fork was missing this helper. Without it, the MPV surface stays visible on back-navigation. Both Watch Together exit and default exit branches in `_handleBackButton()` now call this helper.
+
+### Focus Reclaim — Round 2 (completed, but introduced regression)
+- [x] **`context.watch` → `context.read`** (`lib/widgets/video_controls/parts/navigation.dart` line 11) — Background VIDYA token validation fires `notifyListeners()` during Plex playback, causing spurious rebuilds of `PlexVideoControls` that race with focus reclaim.
+- [x] **VIDYA health-check recovery timer** (`lib/services/multi_server_manager.dart`) — `_vidyaRetryTimer`: `Timer.periodic(30 s)` polls offline VIDYA clients and re-applies health status on recovery.
+- [⚠️] **Three-shot `_reclaimFocusAfterControlsHide()`** (`lib/widgets/video_controls/parts/visibility.dart`) — Added a third nested `addPostFrameCallback` that fires unconditionally, creating an infinite hide→reclaim→hide loop. Controls lock visible permanently; back button breaks.
+
+### Continue Learning Row — Round 2 (completed, but not root cause)
+- [x] **`_hasVidyaOnDeck` converted from field to getter** (`lib/screens/discover_screen.dart`) — Correct change, but not the cause of row disappearance.
+- [x] **`AutomaticKeepAliveClientMixin`** (added in Round 1, reverted in Round 2) — `SliverToBoxAdapter` does not support keepAlive; mixin was ineffective.
+
+### Pending Fixes (awaiting implementation)
+
+- [ ] **Fix `_reclaimFocusAfterControlsHide()` infinite loop** (`lib/widgets/video_controls/parts/visibility.dart`) — Remove nested shot #3 (lines 295–298). Revert to two-shot pattern.
+
+- [ ] **Fix Continue Learning row displacement** (`lib/providers/discover_provider.dart`) — `_applyOnDeck(fetched)` wholesale-replaces `_onDeck`; VIDYA items evicted when background Plex refresh returns no VIDYA data. Fix: preserve existing VIDYA items when fresh fetch returns none.
+
+---
+
 ## Future / Backlog
 
-- Set up local APK compilation (requires Android SDK CLI tools + JDK 17 — see CLAUDE.md)
 - Token refresh flow in `VidyaApiClient` — refresh JWT automatically when 401 received during playback
 - D-pad seek-bar scrubbing — hold Left/Right to skip in larger increments
 - Subtitle track selection for VIDYA lectures (SRT → WebVTT served by server)
