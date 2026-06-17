@@ -1,6 +1,6 @@
 # CLAUDE.md — Plezy (with VIDYA support)
 
-> Last updated: 2026-06-16 — Dead legacy player cluster deleted; Vidya backend dead routes removed
+> Last updated: 2026-06-16 — Phase 1a: home screen rewiring, Vidya server naming
 
 ---
 
@@ -150,6 +150,39 @@ VidyaPlaybackSession (ephemeral, in-memory only)
 - **In-flight deduplication** — `_pendingHomeFetch`; concurrent callers share the same `Future` rather than firing parallel requests
 
 Do not call `_fetchHome()` directly outside of `fetchContinueWatching()` / `fetchGlobalHubs()`.
+
+**`serverName` live-cache override (Phase 1a):** The `serverName` getter first reads `_homeCache?['server_name']`; falls back to URL-authority string only on cold boot before the first home fetch. The `server_name` string is populated by `GET /api/v1/home` on the VIDYA backend.
+
+---
+
+## Discover screen — Vidya row ordering (Phase 1a)
+
+`lib/screens/discover_screen.dart` renders Vidya rows in a completely separate section below all Plex/Jellyfin content. The filter key is `item.serverId?.startsWith('vidya-')` (and `hub.serverId?.startsWith('vidya-')`), matching `VidyaAccountConnection.id = "vidya-{uuid}"`.
+
+**Rendered order (both TV and non-TV paths):**
+1. Non-Vidya "Continue Watching" row (`_continueWatchingHubKey`) — Vidya items filtered out
+2. Non-Vidya recommendation hubs
+3. "Continue Learning" row (`_vidyaContinueLearningHubKey`) — Vidya in-progress items only
+4. Vidya content hubs (e.g. "All Courses")
+
+**State fields added:**
+- `_vidyaContinueLearningHubKey` — `GlobalKey<HubSectionState>?`, initialized in `_updateHubKeys()`
+- `_hasVidyaOnDeck` — `bool`, set in `_updateHubKeys()` via `_onDeck.any((item) => item.serverId?.startsWith('vidya-') == true)`
+
+**`_allHubKeys` ordering:** `[non-Vidya CW?] → [non-Vidya hubs] → [Vidya CL?] → [Vidya hubs]` — must match the visual render order exactly for D-pad `_handleVerticalNavigation` index arithmetic to be correct.
+
+**Navigation index precomputation (in `_buildContent()`):**
+```dart
+final cwNavIdx = nonVidyaOnDeck.isNotEmpty ? 0 : -1;
+final nonVidyaHubNavStart = nonVidyaOnDeck.isNotEmpty ? 1 : 0;
+final vidyaClBase = nonVidyaHubNavStart + nonVidyaHubIndices.length;
+final vidyaClNavIdx = vidyaOnDeck.isNotEmpty ? vidyaClBase : -1;
+final vidyaHubNavStart = vidyaClBase + (vidyaOnDeck.isNotEmpty ? 1 : 0);
+```
+
+**`loadMoreItems` filter:** The "load all" callback for the Continue Watching row wraps `_discover.loadAllContinueWatching()` with a `.where((item) => item.serverId?.startsWith('vidya-') != true)` filter to prevent Vidya items reappearing after pagination.
+
+**Icon:** Vidya rows use `Symbols.school_rounded`; Continue Learning has `isInContinueWatching: true` for progress overlays.
 
 ---
 

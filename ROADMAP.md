@@ -1,6 +1,6 @@
 # Plezy — Roadmap
 
-> Last updated: 2026-06-16 — Dead legacy player cluster removed (VidyaPlayerScreen, VidyaCoursePanel, VidyaLectureResources)
+> Last updated: 2026-06-16 — Phase 1a complete: home screen rewiring, Vidya server naming
 
 ---
 
@@ -23,6 +23,7 @@
 | Feature Vertical 3 | ✅ Complete | VidyaCoursePlayerView — Udemy-style split player |
 | Feature Vertical 4 | ✅ Complete | VIDYA courses on home screen — JWT auto-refresh, MediaServerClient, home endpoint |
 | Performance Regression Audit | ✅ Complete | Full regressive audit vs original repo; 4 regressions identified and fixed (see `audit.md`) |
+| Phase 1a — Home Screen Rewiring & Server Naming | ✅ Complete | Dedicated Vidya rows on Discover screen; custom server name API + admin UI |
 
 ---
 
@@ -126,6 +127,35 @@
 - [x] **P3** — Restore `profile_connection_cleanup.dart` and startup `pruneUnreferencedJellyfinConnections()` call; port missing `StorageService` server-cleanup helpers (`clearLibraryPreferencesForServer`, `clearLibraryPreferencesForServerEverywhere`, 8 private helpers)
 - [x] **P4** — Cache `SharedPreferences` instance in `VidyaPlaybackTracker` via `_getPrefs()` (was calling `SharedPreferences.getInstance()` on every 15-second timer tick during network failure)
 - [x] **Backlog** — Redundant `fetchCourseWithContent()` in `VidyaLectureResources` + `VidyaCoursePanel` resolved by deleting the dead files entirely
+
+---
+
+---
+
+## Phase 1a — Home Screen Rewiring & Server Naming `complete`
+
+### Discover Screen (Plezy — `lib/screens/discover_screen.dart`)
+- [x] **Option B clean separation**: Vidya in-progress items filtered OUT of standard "Continue Watching" row; appear exclusively in the new "Continue Learning" row
+- [x] **"Continue Learning" row**: dedicated `HubSection` at the bottom of the non-TV path; `TvBrowseRail` hub appended last on TV path; uses `Symbols.school_rounded` icon; `isInContinueWatching: true` for progress overlays
+- [x] **Vidya hubs last**: Vidya "All Courses" hub (and any future Vidya hubs) rendered below Continue Learning, after all non-Vidya recommendation hubs
+- [x] **`_allHubKeys` reordered**: `[non-Vidya CW?] → [non-Vidya hubs] → [Vidya CL?] → [Vidya hubs]` — D-pad up/down navigation correctly traverses all rows on both TV and mobile
+- [x] **`_tvBrowseHubs` reordered**: same ordering for the TV `TvBrowseRail`, including `isContinueWatchingHub` for both `continue_watching` and `continue_learning`
+- [x] **`loadMoreItems` filter**: "load all" callback for continue_watching filters Vidya items from result to prevent mixing
+
+### Course Artwork (Plezy — `lib/services/vidya_media_server_client.dart`)
+- [x] `_courseToMediaItem` kind changed `MediaKind.show → MediaKind.movie` — course thumbnails now render as 16:9 landscape banners matching Vidya's photo aspect ratio; navigation unaffected (intercepted by backend check before kind-switch)
+
+### Server Naming — Backend (Vidya)
+- [x] `GET /api/v1/home`: includes `server_name` key in response payload (sourced from `Server.name` in SQLite)
+- [x] `POST /api/admin/server-name`: new admin route to update `Server.name`; validates non-empty body
+- [x] `GET /api/admin/admin`: `getAdminData` now fetches `Server.findOne()` in the same `Promise.all` and returns `serverName` in the response
+
+### Server Naming — Admin UI (Vidya — `src/components/Settings/Admin.js`)
+- [x] "Server Name" text input + Save button added at the top of Admin Settings, above Folders
+- [x] Loads current name from `getAdminData` response on mount; saves via `POST /api/admin/server-name`
+
+### Server Naming — Client Bridge (Plezy — `lib/services/vidya_media_server_client.dart`)
+- [x] `serverName` getter reads live `server_name` from the home cache; falls back to URL-authority string on cold boot (before first home fetch)
 
 ---
 
