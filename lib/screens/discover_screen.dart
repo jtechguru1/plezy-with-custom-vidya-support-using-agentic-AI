@@ -121,6 +121,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   // Hub navigation keys
   GlobalKey<HubSectionState>? _continueWatchingHubKey;
+  GlobalKey<HubSectionState>? _vidyaContinueLearningHubKey;
+  bool _hasVidyaOnDeck = false;
   final Map<String, GlobalKey<HubSectionState>> _hubKeysByIdentity = {};
   List<GlobalKey<HubSectionState>> _orderedHubKeys = const [];
   final _tvBrowseRailKey = GlobalKey<TvBrowseRailState>();
@@ -164,15 +166,31 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _hubKeysByIdentity.removeWhere((identity, _) => !liveIdentities.contains(identity));
     _orderedHubKeys = ordered;
     _continueWatchingHubKey ??= GlobalKey<HubSectionState>();
+    _vidyaContinueLearningHubKey ??= GlobalKey<HubSectionState>();
+    _hasVidyaOnDeck = _onDeck.any((item) => item.serverId?.startsWith('vidya-') == true);
   }
 
-  /// Get all hub states (continue watching + other hubs)
+  /// Hub keys in rendered order: [non-Vidya CW?] [non-Vidya hubs] [Vidya CL?] [Vidya hubs]
   List<GlobalKey<HubSectionState>> get _allHubKeys {
     final keys = <GlobalKey<HubSectionState>>[];
-    if (_continueWatchingHubKey != null && _onDeck.isNotEmpty) {
+    final hasNonVidyaOnDeck =
+        _onDeck.any((item) => item.serverId?.startsWith('vidya-') != true);
+    if (_continueWatchingHubKey != null && hasNonVidyaOnDeck) {
       keys.add(_continueWatchingHubKey!);
     }
-    keys.addAll(_orderedHubKeys);
+    for (int i = 0; i < _hubs.length && i < _orderedHubKeys.length; i++) {
+      if (_hubs[i].serverId?.startsWith('vidya-') != true) {
+        keys.add(_orderedHubKeys[i]);
+      }
+    }
+    if (_vidyaContinueLearningHubKey != null && _hasVidyaOnDeck) {
+      keys.add(_vidyaContinueLearningHubKey!);
+    }
+    for (int i = 0; i < _hubs.length && i < _orderedHubKeys.length; i++) {
+      if (_hubs[i].serverId?.startsWith('vidya-') == true) {
+        keys.add(_orderedHubKeys[i]);
+      }
+    }
     return keys;
   }
 
@@ -188,20 +206,40 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
   List<MediaHub> get _tvBrowseHubs {
     final hubs = <MediaHub>[];
-    if (_onDeck.isNotEmpty) {
-      hubs.add(
-        MediaHub(
-          id: 'continue_watching',
-          title: t.discover.continueWatching,
-          type: 'mixed',
-          identifier: '_continue_watching_',
-          size: _onDeck.length + (_hasMoreContinueWatching ? 1 : 0),
-          more: _hasMoreContinueWatching,
-          items: _onDeck,
-        ),
-      );
+    final nonVidyaOnDeck =
+        _onDeck.where((item) => item.serverId?.startsWith('vidya-') != true).toList();
+    final vidyaOnDeck =
+        _onDeck.where((item) => item.serverId?.startsWith('vidya-') == true).toList();
+    // Standard Continue Watching — non-Vidya (Plex/Jellyfin) only
+    if (nonVidyaOnDeck.isNotEmpty) {
+      hubs.add(MediaHub(
+        id: 'continue_watching',
+        title: t.discover.continueWatching,
+        type: 'mixed',
+        identifier: '_continue_watching_',
+        size: nonVidyaOnDeck.length + (_hasMoreContinueWatching ? 1 : 0),
+        more: _hasMoreContinueWatching,
+        items: nonVidyaOnDeck,
+      ));
     }
-    hubs.addAll(_hubs.where((hub) => hub.items.isNotEmpty));
+    // Non-Vidya recommendation hubs
+    hubs.addAll(_hubs.where(
+        (hub) => hub.serverId?.startsWith('vidya-') != true && hub.items.isNotEmpty));
+    // Vidya Continue Learning — at the bottom
+    if (vidyaOnDeck.isNotEmpty) {
+      hubs.add(MediaHub(
+        id: 'continue_learning',
+        title: 'Continue Learning',
+        type: 'mixed',
+        identifier: '_continue_learning_',
+        size: vidyaOnDeck.length,
+        more: false,
+        items: vidyaOnDeck,
+      ));
+    }
+    // Vidya All Courses and other Vidya hubs — at the bottom
+    hubs.addAll(_hubs.where(
+        (hub) => hub.serverId?.startsWith('vidya-') == true && hub.items.isNotEmpty));
     return hubs;
   }
 
@@ -1070,6 +1108,27 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final showServerNameOnHubs = svc.read(SettingsService.showServerNameOnHubs);
     final duplicateHubTitles = _getDuplicateHubTitles();
 
+    // Vidya/non-Vidya splits for Option B (clean separation of continue watching)
+    final nonVidyaOnDeck =
+        _onDeck.where((item) => item.serverId?.startsWith('vidya-') != true).toList();
+    final vidyaOnDeck =
+        _onDeck.where((item) => item.serverId?.startsWith('vidya-') == true).toList();
+    final nonVidyaHubIndices = <int>[
+      for (int i = 0; i < _hubs.length; i++)
+        if (_hubs[i].serverId?.startsWith('vidya-') != true) i,
+    ];
+    final vidyaHubIndices = <int>[
+      for (int i = 0; i < _hubs.length; i++)
+        if (_hubs[i].serverId?.startsWith('vidya-') == true) i,
+    ];
+    // Navigation positions in _allHubKeys:
+    // [non-Vidya CW?] [non-Vidya hubs...] [Vidya CL?] [Vidya hubs...]
+    final cwNavIdx = nonVidyaOnDeck.isNotEmpty ? 0 : -1;
+    final nonVidyaHubNavStart = nonVidyaOnDeck.isNotEmpty ? 1 : 0;
+    final vidyaClBase = nonVidyaHubNavStart + nonVidyaHubIndices.length;
+    final vidyaClNavIdx = vidyaOnDeck.isNotEmpty ? vidyaClBase : -1;
+    final vidyaHubNavStart = vidyaClBase + (vidyaOnDeck.isNotEmpty ? 1 : 0);
+
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
     final theme = Theme.of(context);
     return Material(
@@ -1094,8 +1153,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               if (_isLoading) LoadingIndicatorBox.sliver,
               if (_errorMessage != null) SliverErrorState(message: _errorMessage!, onRetry: _discover.load),
               if (!_isLoading && _errorMessage == null) ...[
-                // On Deck / Continue Watching
-                if (_onDeck.isNotEmpty)
+                // Standard Continue Watching — non-Vidya (Plex/Jellyfin) items only
+                if (nonVidyaOnDeck.isNotEmpty)
                   SliverToBoxAdapter(
                     child: HubSection(
                       key: _continueWatchingHubKey,
@@ -1104,33 +1163,89 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                         title: t.discover.continueWatching,
                         type: 'mixed',
                         identifier: '_continue_watching_',
-                        size: _onDeck.length + (_hasMoreContinueWatching ? 1 : 0),
+                        size: nonVidyaOnDeck.length + (_hasMoreContinueWatching ? 1 : 0),
                         more: _hasMoreContinueWatching,
-                        items: _onDeck,
+                        items: nonVidyaOnDeck,
                       ),
                       icon: Symbols.play_circle_rounded,
                       onRefresh: _discover.updateItem,
                       onRemoveFromContinueWatching: _discover.refreshContinueWatching,
                       isInContinueWatching: true,
-                      loadMoreItems: _discover.loadAllContinueWatching,
-                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(0, isUp),
+                      loadMoreItems: () => _discover.loadAllContinueWatching().then(
+                          (all) => all
+                              .where((item) => item.serverId?.startsWith('vidya-') != true)
+                              .toList()),
+                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(cwNavIdx, isUp),
                       onNavigateUp: _focusTopBoundary,
                       onNavigateToSidebar: _navigateToSidebar,
                     ),
                   ),
 
-                // Recommendation Hubs (Trending, Top in Genre, etc.)
-                for (int i = 0; i < _hubs.length; i++)
+                // Non-Vidya recommendation hubs (Trending, Top in Genre, etc.)
+                for (int i = 0; i < nonVidyaHubIndices.length; i++)
                   SliverToBoxAdapter(
                     child: HubSection(
-                      key: i < _orderedHubKeys.length ? _orderedHubKeys[i] : null,
-                      hub: _hubs[i],
-                      icon: _getHubIcon(_hubs[i].title),
-                      showServerName: showServerNameOnHubs || duplicateHubTitles.contains(_hubs[i].title),
+                      key: nonVidyaHubIndices[i] < _orderedHubKeys.length
+                          ? _orderedHubKeys[nonVidyaHubIndices[i]]
+                          : null,
+                      hub: _hubs[nonVidyaHubIndices[i]],
+                      icon: _getHubIcon(_hubs[nonVidyaHubIndices[i]].title),
+                      showServerName: showServerNameOnHubs ||
+                          duplicateHubTitles.contains(_hubs[nonVidyaHubIndices[i]].title),
                       onRefresh: _discover.updateItem,
-                      // Hub index is i + 1 if continue watching exists, otherwise i
-                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(_onDeck.isNotEmpty ? i + 1 : i, isUp),
-                      onNavigateUp: (i == 0 && _onDeck.isEmpty) ? _focusTopBoundary : null,
+                      onVerticalNavigation: (isUp) =>
+                          _handleVerticalNavigation(nonVidyaHubNavStart + i, isUp),
+                      onNavigateUp: (i == 0 && nonVidyaOnDeck.isEmpty) ? _focusTopBoundary : null,
+                      onNavigateToSidebar: _navigateToSidebar,
+                    ),
+                  ),
+
+                // Vidya "Continue Learning" — dedicated row at the bottom
+                if (vidyaOnDeck.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: HubSection(
+                      key: _vidyaContinueLearningHubKey,
+                      hub: MediaHub(
+                        id: 'continue_learning',
+                        title: 'Continue Learning',
+                        type: 'mixed',
+                        identifier: '_continue_learning_',
+                        size: vidyaOnDeck.length,
+                        more: false,
+                        items: vidyaOnDeck,
+                      ),
+                      icon: Symbols.school_rounded,
+                      onRefresh: _discover.updateItem,
+                      onRemoveFromContinueWatching: _discover.refreshContinueWatching,
+                      isInContinueWatching: true,
+                      onVerticalNavigation: (isUp) =>
+                          _handleVerticalNavigation(vidyaClNavIdx, isUp),
+                      onNavigateUp: (nonVidyaOnDeck.isEmpty && nonVidyaHubIndices.isEmpty)
+                          ? _focusTopBoundary
+                          : null,
+                      onNavigateToSidebar: _navigateToSidebar,
+                    ),
+                  ),
+
+                // Vidya All Courses and other Vidya browse hubs — at the bottom
+                for (int i = 0; i < vidyaHubIndices.length; i++)
+                  SliverToBoxAdapter(
+                    child: HubSection(
+                      key: vidyaHubIndices[i] < _orderedHubKeys.length
+                          ? _orderedHubKeys[vidyaHubIndices[i]]
+                          : null,
+                      hub: _hubs[vidyaHubIndices[i]],
+                      icon: Symbols.school_rounded,
+                      showServerName: showServerNameOnHubs,
+                      onRefresh: _discover.updateItem,
+                      onVerticalNavigation: (isUp) =>
+                          _handleVerticalNavigation(vidyaHubNavStart + i, isUp),
+                      onNavigateUp: (i == 0 &&
+                              nonVidyaOnDeck.isEmpty &&
+                              nonVidyaHubIndices.isEmpty &&
+                              vidyaOnDeck.isEmpty)
+                          ? _focusTopBoundary
+                          : null,
                       onNavigateToSidebar: _navigateToSidebar,
                     ),
                   ),
@@ -1308,14 +1423,29 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               child: TvBrowseRail(
                 key: _tvBrowseRailKey,
                 hubs: browseHubs,
-                iconForHub: (hub, _) =>
-                    hub.id == 'continue_watching' ? Symbols.play_circle_rounded : _getHubIcon(hub.title),
+                iconForHub: (hub, _) {
+                  if (hub.id == 'continue_watching') return Symbols.play_circle_rounded;
+                  if (hub.id == 'continue_learning' ||
+                      hub.serverId?.startsWith('vidya-') == true) {
+                    return Symbols.school_rounded;
+                  }
+                  return _getHubIcon(hub.title);
+                },
                 onFocusedItemChanged: _setSpotlightItem,
                 onRefresh: _discover.updateItem,
                 onRemoveFromContinueWatching: _discover.refreshContinueWatching,
-                isContinueWatchingHub: (hub) => hub.id == 'continue_watching',
-                loadMoreItems: (hub) =>
-                    hub.id == 'continue_watching' ? _discover.loadAllContinueWatching() : Future.value(hub.items),
+                isContinueWatchingHub: (hub) =>
+                    hub.id == 'continue_watching' || hub.id == 'continue_learning',
+                loadMoreItems: (hub) {
+                  if (hub.id == 'continue_watching') {
+                    return _discover.loadAllContinueWatching().then(
+                      (all) => all
+                          .where((item) => item.serverId?.startsWith('vidya-') != true)
+                          .toList(),
+                    );
+                  }
+                  return Future.value(hub.items);
+                },
                 onNavigateUp: _focusTopActions,
                 onNavigateToSidebar: _navigateToSidebar,
                 tallPosterScale: TvBrowseRailLayout.compactTallPosterScale,

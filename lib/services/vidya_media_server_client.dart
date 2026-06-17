@@ -59,7 +59,11 @@ class VidyaMediaServerClient extends MediaServerClient {
   ServerId get serverId => ServerId(_connection.id);
 
   @override
-  String? get serverName => _connection.serverName;
+  String? get serverName {
+    final cached = _homeCache?['server_name'] as String?;
+    if (cached != null && cached.isNotEmpty) return cached;
+    return _connection.serverName;
+  }
 
   @override
   MediaBackend get backend => MediaBackend.vidya;
@@ -194,7 +198,7 @@ class VidyaMediaServerClient extends MediaServerClient {
     final dur = (e['duration'] as num?)?.toDouble() ?? 0.0;
     return MediaItem.vidya(
       id: e['course_id'] as String? ?? '',
-      kind: MediaKind.show,
+      kind: MediaKind.movie,
       title: e['title'] as String?,
       thumbPath: e['photo'] as String?,
       durationMs: dur > 0 ? (dur * 1000).round() : null,
