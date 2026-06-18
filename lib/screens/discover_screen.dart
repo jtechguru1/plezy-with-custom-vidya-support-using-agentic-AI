@@ -169,25 +169,35 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _vidyaContinueLearningHubKey ??= GlobalKey<HubSectionState>();
   }
 
+  void _toggleLearningMode() {
+    final svc = SettingsService.instance;
+    svc.write(SettingsService.learningMode, !svc.read(SettingsService.learningMode));
+  }
+
   /// Hub keys in rendered order: [non-Vidya CW?] [non-Vidya hubs] [Vidya CL?] [Vidya hubs]
   List<GlobalKey<HubSectionState>> get _allHubKeys {
+    final isLearningMode = SettingsService.instance.read(SettingsService.learningMode);
     final keys = <GlobalKey<HubSectionState>>[];
-    final hasNonVidyaOnDeck =
-        _onDeck.any((item) => item.serverId?.startsWith('vidya-') != true);
-    if (_continueWatchingHubKey != null && hasNonVidyaOnDeck) {
-      keys.add(_continueWatchingHubKey!);
-    }
-    for (int i = 0; i < _hubs.length && i < _orderedHubKeys.length; i++) {
-      if (_hubs[i].serverId?.startsWith('vidya-') != true) {
-        keys.add(_orderedHubKeys[i]);
+    if (!isLearningMode) {
+      final hasNonVidyaOnDeck =
+          _onDeck.any((item) => item.serverId?.startsWith('vidya-') != true);
+      if (_continueWatchingHubKey != null && hasNonVidyaOnDeck) {
+        keys.add(_continueWatchingHubKey!);
+      }
+      for (int i = 0; i < _hubs.length && i < _orderedHubKeys.length; i++) {
+        if (_hubs[i].serverId?.startsWith('vidya-') != true) {
+          keys.add(_orderedHubKeys[i]);
+        }
       }
     }
-    if (_vidyaContinueLearningHubKey != null && _hasVidyaOnDeck) {
-      keys.add(_vidyaContinueLearningHubKey!);
-    }
-    for (int i = 0; i < _hubs.length && i < _orderedHubKeys.length; i++) {
-      if (_hubs[i].serverId?.startsWith('vidya-') == true) {
-        keys.add(_orderedHubKeys[i]);
+    if (isLearningMode) {
+      if (_vidyaContinueLearningHubKey != null && _hasVidyaOnDeck) {
+        keys.add(_vidyaContinueLearningHubKey!);
+      }
+      for (int i = 0; i < _hubs.length && i < _orderedHubKeys.length; i++) {
+        if (_hubs[i].serverId?.startsWith('vidya-') == true) {
+          keys.add(_orderedHubKeys[i]);
+        }
       }
     }
     return keys;
@@ -204,11 +214,14 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   }
 
   List<MediaHub> get _tvBrowseHubs {
+    final isLearningMode = SettingsService.instance.read(SettingsService.learningMode);
     final hubs = <MediaHub>[];
-    final nonVidyaOnDeck =
-        _onDeck.where((item) => item.serverId?.startsWith('vidya-') != true).toList();
-    final vidyaOnDeck =
-        _onDeck.where((item) => item.serverId?.startsWith('vidya-') == true).toList();
+    final nonVidyaOnDeck = isLearningMode
+        ? <MediaItem>[]
+        : _onDeck.where((item) => item.serverId?.startsWith('vidya-') != true).toList();
+    final vidyaOnDeck = isLearningMode
+        ? _onDeck.where((item) => item.serverId?.startsWith('vidya-') == true).toList()
+        : <MediaItem>[];
     // Standard Continue Watching — non-Vidya (Plex/Jellyfin) only
     if (nonVidyaOnDeck.isNotEmpty) {
       hubs.add(MediaHub(
@@ -222,8 +235,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       ));
     }
     // Non-Vidya recommendation hubs
-    hubs.addAll(_hubs.where(
-        (hub) => hub.serverId?.startsWith('vidya-') != true && hub.items.isNotEmpty));
+    if (!isLearningMode)
+      hubs.addAll(_hubs.where(
+          (hub) => hub.serverId?.startsWith('vidya-') != true && hub.items.isNotEmpty));
     // Vidya Continue Learning — at the bottom
     if (vidyaOnDeck.isNotEmpty) {
       hubs.add(MediaHub(
@@ -237,8 +251,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       ));
     }
     // Vidya All Courses and other Vidya hubs — at the bottom
-    hubs.addAll(_hubs.where(
-        (hub) => hub.serverId?.startsWith('vidya-') == true && hub.items.isNotEmpty));
+    if (isLearningMode)
+      hubs.addAll(_hubs.where(
+          (hub) => hub.serverId?.startsWith('vidya-') == true && hub.items.isNotEmpty));
     return hubs;
   }
 
@@ -963,11 +978,23 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                 builder: (context, watchTogether, companionRemote, _) {
                   final isDesktop = PlatformDetector.shouldActAsRemoteHost(context);
 
+                  final hasVidyaServer = context
+                      .read<MultiServerProvider>()
+                      .serverIds
+                      .any((id) => id.startsWith('vidya-'));
                   return FocusableActionBar(
                     key: _actionBarKey,
                     onNavigateLeft: _navigateToSidebar,
                     onNavigateDown: _focusContentFromAppBar,
                     actions: [
+                      if (hasVidyaServer)
+                        FocusableAction(
+                          icon: SettingsService.instance.read(SettingsService.learningMode)
+                              ? Symbols.tv_rounded
+                              : Symbols.school_rounded,
+                          iconColor: foregroundColor,
+                          onPressed: _toggleLearningMode,
+                        ),
                       FocusableAction(
                         icon: Symbols.refresh_rounded,
                         iconColor: foregroundColor,
@@ -1091,6 +1118,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         SettingsService.hideSpoilers,
         SettingsService.libraryDensity,
         SettingsService.episodePosterMode,
+        SettingsService.learningMode,
       ],
       builder: (context) => _buildContent(context),
     );
@@ -1107,19 +1135,27 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     final showServerNameOnHubs = svc.read(SettingsService.showServerNameOnHubs);
     final duplicateHubTitles = _getDuplicateHubTitles();
 
-    // Vidya/non-Vidya splits for Option B (clean separation of continue watching)
-    final nonVidyaOnDeck =
-        _onDeck.where((item) => item.serverId?.startsWith('vidya-') != true).toList();
-    final vidyaOnDeck =
-        _onDeck.where((item) => item.serverId?.startsWith('vidya-') == true).toList();
-    final nonVidyaHubIndices = <int>[
-      for (int i = 0; i < _hubs.length; i++)
-        if (_hubs[i].serverId?.startsWith('vidya-') != true) i,
-    ];
-    final vidyaHubIndices = <int>[
-      for (int i = 0; i < _hubs.length; i++)
-        if (_hubs[i].serverId?.startsWith('vidya-') == true) i,
-    ];
+    final isLearningMode = svc.read(SettingsService.learningMode);
+
+    // Vidya/non-Vidya splits — gated by learning mode
+    final nonVidyaOnDeck = isLearningMode
+        ? <MediaItem>[]
+        : _onDeck.where((item) => item.serverId?.startsWith('vidya-') != true).toList();
+    final vidyaOnDeck = isLearningMode
+        ? _onDeck.where((item) => item.serverId?.startsWith('vidya-') == true).toList()
+        : <MediaItem>[];
+    final nonVidyaHubIndices = isLearningMode
+        ? <int>[]
+        : <int>[
+            for (int i = 0; i < _hubs.length; i++)
+              if (_hubs[i].serverId?.startsWith('vidya-') != true) i,
+          ];
+    final vidyaHubIndices = isLearningMode
+        ? <int>[
+            for (int i = 0; i < _hubs.length; i++)
+              if (_hubs[i].serverId?.startsWith('vidya-') == true) i,
+          ]
+        : <int>[];
     // Navigation positions in _allHubKeys:
     // [non-Vidya CW?] [non-Vidya hubs...] [Vidya CL?] [Vidya hubs...]
     final cwNavIdx = nonVidyaOnDeck.isNotEmpty ? 0 : -1;

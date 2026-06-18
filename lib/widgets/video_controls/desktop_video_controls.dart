@@ -187,6 +187,7 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
   // Progressive seek acceleration state
   LogicalKeyboardKey? _seekDirection; // Current direction being held
   int _seekRepeatCount = 0; // Consecutive key repeats for acceleration
+  Duration? _lastKeySeekPosition;
 
   // Preview thumbnail during sustained dpad/keyboard seeking
   bool _showKeyRepeatThumbnail = false;
@@ -454,6 +455,7 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
   void _resetSeekState() {
     _seekDirection = null;
     _seekRepeatCount = 0;
+    _lastKeySeekPosition = null;
     _keyRepeatThumbnailTimer?.cancel();
     _keyRepeatThumbnailTimer = null;
     if (_showKeyRepeatThumbnail) {
@@ -494,7 +496,11 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
     // Handle key release to reset progressive seek state
     if (event is KeyUpEvent) {
       if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+        final finalPosition = _lastKeySeekPosition;
         _resetSeekState();
+        if (finalPosition != null) {
+          widget.onSeekEnd(finalPosition);
+        }
       }
       return KeyEventResult.ignored;
     }
@@ -561,6 +567,7 @@ class DesktopVideoControlsState extends State<DesktopVideoControls> {
       // Clamp to valid range
       final clampedPosition = Duration(milliseconds: newPosition.inMilliseconds.clamp(0, duration.inMilliseconds));
 
+      _lastKeySeekPosition = clampedPosition;
       widget.onSeek(clampedPosition);
       widget.onFocusActivity?.call();
       return KeyEventResult.handled;

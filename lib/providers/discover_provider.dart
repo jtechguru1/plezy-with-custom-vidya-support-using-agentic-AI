@@ -308,7 +308,11 @@ class DiscoverProvider extends ChangeNotifier with DisposableChangeNotifierMixin
         hiddenLibraryKeys: _hiddenLibraries.hiddenLibraryKeys,
       );
       if (isDisposed) return;
-      _applyOnDeck(fetched);
+      final freshVidya = fetched.where((i) => i.serverId?.startsWith('vidya-') == true).toList();
+      final merged = freshVidya.isNotEmpty
+          ? fetched
+          : [...fetched, ..._onDeck.where((i) => i.serverId?.startsWith('vidya-') == true)];
+      _applyOnDeck(merged);
       safeNotifyListeners();
       unawaited(_syncSystemShelf(_onDeck));
     } catch (e) {
