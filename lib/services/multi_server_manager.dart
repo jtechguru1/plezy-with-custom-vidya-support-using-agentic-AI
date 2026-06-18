@@ -151,6 +151,10 @@ class MultiServerManager {
     return client is PlexClient ? client : null;
   }
 
+  /// Returns all connected VIDYA server clients.
+  List<VidyaMediaServerClient> getVidyaClients() =>
+      _clients.values.whereType<VidyaMediaServerClient>().toList();
+
   void updatePlexLanguage(String languageCode) {
     for (final client in _clients.values) {
       if (client is PlexClient) {

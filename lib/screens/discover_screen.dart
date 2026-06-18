@@ -998,7 +998,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       FocusableAction(
                         icon: Symbols.refresh_rounded,
                         iconColor: foregroundColor,
-                        onPressed: _discover.load,
+                        onPressed: SettingsService.instance.read(SettingsService.learningMode)
+                            ? _discover.refreshVidyaContent
+                            : _discover.load,
                       ),
                       // Watch Together
                       FocusableAction(

@@ -205,6 +205,14 @@ class MultiServerProvider extends ChangeNotifier with DisposableChangeNotifierMi
     return _serverManager.getPlexClient(serverId);
   }
 
+  /// Invalidates the in-memory home cache on every connected VIDYA server so
+  /// the next hub/on-deck fetch retrieves fresh data from the server.
+  void invalidateVidyaHomeCache() {
+    for (final client in _serverManager.getVidyaClients()) {
+      client.invalidateHomeCache();
+    }
+  }
+
   /// Get all online server IDs (visibility-filtered).
   List<String> get onlineServerIds {
     final all = _serverManager.onlineServerIds;

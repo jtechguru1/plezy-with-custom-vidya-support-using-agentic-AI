@@ -126,6 +126,14 @@ class DiscoverProvider extends ChangeNotifier with DisposableChangeNotifierMixin
     return _ensureLoadLoop();
   }
 
+  /// VIDYA-only refresh. Busts the in-memory home cache on every connected
+  /// VIDYA server, then triggers a full content reload so both Continue
+  /// Watching and My Courses hubs reflect the latest server state.
+  Future<void> refreshVidyaContent() {
+    _multiServer.invalidateVidyaHomeCache();
+    return load();
+  }
+
   /// Full load of Continue Watching + hubs. Concurrent calls coalesce into
   /// the in-flight pass plus at most one trailing pass (so a request that
   /// arrives mid-load still observes its own fresh fetch).

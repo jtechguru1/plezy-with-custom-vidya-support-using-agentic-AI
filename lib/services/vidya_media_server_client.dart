@@ -69,7 +69,7 @@ class VidyaMediaServerClient extends MediaServerClient {
   MediaBackend get backend => MediaBackend.vidya;
 
   @override
-  ServerCapabilities get capabilities => const ServerCapabilities();
+  ServerCapabilities get capabilities => const ServerCapabilities(richHubs: true);
 
   @override
   bool get isOfflineMode => _offline;
@@ -114,23 +114,27 @@ class VidyaMediaServerClient extends MediaServerClient {
   }) async {
     final data = await _fetchHome();
     final rawHubs = (data['hubs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    return rawHubs.map((hub) {
-      final items = ((hub['items'] as List?)?.cast<Map<String, dynamic>>() ?? [])
-          .map((e) => _courseToMediaItem(e))
-          .take(limit)
-          .toList();
-      return MediaHub(
-        id: hub['id'] as String? ?? '',
-        identifier: hub['id'] as String?,
-        title: hub['title'] as String? ?? 'Courses',
-        type: 'show',
-        items: items,
-        size: items.length,
-        more: false,
-        serverId: _connection.id,
-        serverName: _connection.serverName,
-      );
-    }).toList();
+    if (rawHubs.isNotEmpty) {
+      return rawHubs.map((hub) {
+        final items = ((hub['items'] as List?)?.cast<Map<String, dynamic>>() ?? [])
+            .map((e) => _courseToMediaItem(e))
+            .take(limit)
+            .toList();
+        return MediaHub(
+          id: hub['id'] as String? ?? '',
+          identifier: hub['id'] as String?,
+          title: hub['title'] as String? ?? 'Courses',
+          type: 'show',
+          items: items,
+          size: items.length,
+          more: false,
+          serverId: _connection.id,
+          serverName: _connection.serverName,
+        );
+      }).toList();
+    }
+
+    return [];
   }
 
   @override
@@ -142,6 +146,14 @@ class VidyaMediaServerClient extends MediaServerClient {
 
   @override
   String externalImageUrl(String url, {int? width, int? height}) => url;
+
+  /// Clears the in-memory home cache so the next [fetchGlobalHubs] or
+  /// [fetchContinueWatching] call hits the server instead of the 30-second TTL.
+  void invalidateHomeCache() {
+    _homeCache = null;
+    _homeCacheTime = null;
+    _pendingHomeFetch = null;
+  }
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
@@ -180,7 +192,9 @@ class VidyaMediaServerClient extends MediaServerClient {
       title: e['lecture_title'] as String?,
       grandparentId: e['course_id'] as String?,
       grandparentTitle: e['course_title'] as String?,
-      grandparentThumbPath: e['course_photo'] as String?,
+      grandparentThumbPath: e['course_photo'] != null
+          ? thumbnailUrl(e['course_photo'] as String)
+          : null,
       parentId: e['section_id'] as String?,
       durationMs: durationSec > 0 ? (durationSec * 1000).round() : null,
       viewOffsetMs: watchTimeSec > 0 ? (watchTimeSec * 1000).round() : null,
@@ -200,7 +214,7 @@ class VidyaMediaServerClient extends MediaServerClient {
       id: e['course_id'] as String? ?? '',
       kind: MediaKind.movie,
       title: e['title'] as String?,
-      thumbPath: e['photo'] as String?,
+      thumbPath: e['photo'] != null ? thumbnailUrl(e['photo'] as String) : null,
       durationMs: dur > 0 ? (dur * 1000).round() : null,
       leafCount: (e['total_lectures'] as num?)?.toInt(),
       viewedLeafCount: (e['completed_lectures'] as num?)?.toInt(),
