@@ -1,6 +1,6 @@
 # CLAUDE.md — Plezy (with VIDYA support)
 
-> Last updated: 2026-06-17 — Post-Phase-1a bug fix session (Round 1–3 diagnosis)
+> Last updated: 2026-06-18 — Course Subscription System + VIDYA-scoped refresh button
 
 ---
 
@@ -113,7 +113,10 @@ When `videoPosition ≥ videoDuration − 500 ms`:
 | `POST /api/auth/token` | `AddVidyaScreen` directly | Returns `{ token, user }` |
 | `GET /api/course` | `VidyaBrowseClient.fetchCourses()` | All courses list |
 | `GET /api/course/:courseId` | `VidyaBrowseClient.fetchCourseDetail()` | Course + sections + lectures (no progress) |
-| `GET /api/v1/home` | `VidyaMediaServerClient.fetchContinueWatching()` / `fetchGlobalHubs()` | Home screen data: in-progress lectures + all courses hub |
+| `GET /api/v1/home` | `VidyaMediaServerClient.fetchContinueWatching()` / `fetchGlobalHubs()` | Home screen data: in-progress lectures + subscribed-courses hub. Returns `hubs: []` when user has 0 subscriptions — no fallback; empty hubs = hidden row. |
+| `GET /api/v1/subscriptions` | (web UI only) | Returns courses the current user has subscribed to |
+| `POST /api/v1/subscriptions/:courseId` | (web UI only) | Subscribe to a course — idempotent (findOrCreate) |
+| `DELETE /api/v1/subscriptions/:courseId` | (web UI only) | Unsubscribe from a course |
 | `GET /api/v1/courses/:courseId/outline` | `VidyaBrowseClient.fetchOutline()` | Course + sections + lessons + per-user progress + attachments |
 | `GET /api/course/stream/:lectureId?token=` | Stream URL passed to `VideoPlayerController.networkUrl()` | Range requests, token in query string |
 | `POST /api/course/player` | `VidyaApiClient.fetchCourseWithContent()` | Includes `content` array per lecture |
@@ -155,7 +158,31 @@ VidyaPlaybackSession (ephemeral, in-memory only)
 
 Do not call `_fetchHome()` directly outside of `fetchContinueWatching()` / `fetchGlobalHubs()`.
 
+**Cache invalidation:** Call `invalidateHomeCache()` (public method added in the Subscription phase) to reset all three private fields (`_homeCache`, `_homeCacheTime`, `_pendingHomeFetch`) to `null`. Used by the VIDYA-scoped refresh path — see "Learning Mode refresh" below.
+
 **`serverName` live-cache override (Phase 1a):** The `serverName` getter first reads `_homeCache?['server_name']`; falls back to URL-authority string only on cold boot before the first home fetch. The `server_name` string is populated by `GET /api/v1/home` on the VIDYA backend.
+
+---
+
+## Learning Mode refresh button
+
+**Pref key:** `BoolPref('learning_mode_enabled')` in `SettingsService` — read via `SettingsService.instance.read(SettingsService.learningMode)`.
+
+**Toggle location:** `lib/screens/discover_screen.dart` lines 172–175.
+
+**Refresh button behavior (`discover_screen.dart` lines 998–1002):**
+
+When Learning Mode is **OFF** → `onPressed: _discover.load` (full all-servers reload, unchanged).
+
+When Learning Mode is **ON** → `onPressed: _discover.refreshVidyaContent` — VIDYA-only scoped refresh:
+
+1. `DiscoverProvider.refreshVidyaContent()` calls `MultiServerProvider.invalidateVidyaHomeCache()`
+2. `MultiServerProvider.invalidateVidyaHomeCache()` iterates `MultiServerManager.getVidyaClients()` and calls `client.invalidateHomeCache()` on each
+3. Then calls `DiscoverProvider.load()` — full reload (VIDYA fetches fresh; Plex/Jellyfin use their own caches)
+
+**Chain:** `invalidateHomeCache()` → `getVidyaClients()` (added to `MultiServerManager`) → `invalidateVidyaHomeCache()` (added to `MultiServerProvider`) → `refreshVidyaContent()` (added to `DiscoverProvider`).
+
+Same `Symbols.refresh_rounded` icon in both modes — only behavior changes.
 
 ---
 

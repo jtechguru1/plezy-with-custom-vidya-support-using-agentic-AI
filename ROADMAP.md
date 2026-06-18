@@ -1,6 +1,6 @@
 # Plezy — Roadmap
 
-> Last updated: 2026-06-17 — Post-Phase-1a bug fix session (Round 1–3; two fixes pending)
+> Last updated: 2026-06-18 — Course Subscription System + VIDYA-scoped refresh button
 
 ---
 
@@ -25,6 +25,8 @@
 | Performance Regression Audit | ✅ Complete | Full regressive audit vs original repo; 4 regressions identified and fixed (see `audit.md`) |
 | Phase 1a — Home Screen Rewiring & Server Naming | ✅ Complete | Dedicated Vidya rows on Discover screen; custom server name API + admin UI |
 | Post-Phase-1a Bug Fixes | 🔄 In Progress | 4 of 6 fixes landed; 2 pending (visibility.dart loop, discover_provider merge) |
+| Course Subscription System | ✅ Complete | Per-user subscriptions on VIDYA backend + web UI; "My Courses" hub in Plezy |
+| VIDYA-Scoped Refresh Button | ✅ Complete | Learning Mode refresh busts only VIDYA home cache; full refresh in non-Learning mode |
 
 ---
 
@@ -189,6 +191,28 @@
 
 ---
 
+## Course Subscription System `complete`
+
+### Client (Plezy)
+- [x] `GET /api/v1/home` hub now returns only subscribed courses — empty `hubs: []` when user has 0 subscriptions; hidden row, no fallback to all-courses list
+- [x] Fallback block removed from `VidyaMediaServerClient.fetchGlobalHubs()` — `return []` when server returns empty hubs
+- [x] Thumbnail null-safety fix — `grandparentThumbPath` uses ternary (`e['course_photo'] != null ? thumbnailUrl(...) : null`) so null photo doesn't produce empty-string path
+
+### Server (VIDYA)
+- See VIDYA ROADMAP Phase: Course Subscription System
+
+---
+
+## VIDYA-Scoped Refresh Button `complete`
+
+- [x] `VidyaMediaServerClient.invalidateHomeCache()` — public method resets `_homeCache`, `_homeCacheTime`, `_pendingHomeFetch`
+- [x] `MultiServerManager.getVidyaClients()` — returns all registered `VidyaMediaServerClient` instances
+- [x] `MultiServerProvider.invalidateVidyaHomeCache()` — iterates VIDYA clients and calls `invalidateHomeCache()` on each
+- [x] `DiscoverProvider.refreshVidyaContent()` — invalidates VIDYA cache then calls `load()`
+- [x] `discover_screen.dart` refresh button — `onPressed` is mode-aware: `refreshVidyaContent` in Learning Mode, `load` otherwise
+
+---
+
 ## Future / Backlog
 
 - Token refresh flow in `VidyaApiClient` — refresh JWT automatically when 401 received during playback
@@ -196,4 +220,5 @@
 - Subtitle track selection for VIDYA lectures (SRT → WebVTT served by server)
 - Resume-from-last-position on launch — use `watch_time` from outline to seek on `_initVideo`
 - Connection health check / reconnect screen on network loss mid-playback
+- VIDYA autoscan — auto-trigger `POST /api/admin/scan` after adding a new course folder (non-priority; manual scan via Settings > Admin already exists)
 - ~~Eliminate dead code: `VidyaPlayerScreen`, `VidyaCoursePanel`, `VidyaLectureResources`~~ — Done
